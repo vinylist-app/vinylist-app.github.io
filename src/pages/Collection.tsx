@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db'
+import { useAlbums } from '../data/hooks'
 import { applyFilters, collectDecades, collectGenres, DEFAULT_FILTERS, type Filters } from '../lib/filters'
 import { AlbumCard } from '../components/AlbumCard'
 import { SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
@@ -16,7 +15,7 @@ const SORTS: { value: Filters['sort']; label: string }[] = [
 ]
 
 export function Collection() {
-  const albums = useLiveQuery(() => db.albums.toArray(), []) ?? []
+  const albums = useAlbums() ?? []
   const [f, setF] = useState<Filters>(DEFAULT_FILTERS)
   const genres = useMemo(() => collectGenres(albums).slice(0, 12), [albums])
   const decades = useMemo(() => collectDecades(albums), [albums])

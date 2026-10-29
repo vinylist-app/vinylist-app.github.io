@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db, exportCollection } from '../db'
+import { useAlbums } from '../data/hooks'
+import { activeCollectionId, useSession } from '../session'
 import { getProfileName, setProfileName } from '../lib/profile'
 import { discogsConfigured } from '../api/discogs'
 import { BackIcon } from '../components/Icons'
@@ -9,10 +10,11 @@ import { Logo } from '../components/Logo'
 import type { Album } from '../types'
 
 export function Settings() {
-  const albums = useLiveQuery(() => db.albums.toArray(), []) ?? []
+  const albums = useAlbums() ?? []
+  const { collection } = useSession()
   const [name, setName] = useState(getProfileName())
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null)
-  const cloud = Boolean(import.meta.env.VITE_SUPABASE_URL)
+  const cloud = Boolean(collection)
 
   function download() {
     const blob = new Blob([exportCollection(albums)], { type: 'application/json' })
@@ -27,7 +29,8 @@ export function Settings() {
     try {
       const data = JSON.parse(await file.text()) as { albums?: Album[] }
       if (!Array.isArray(data.albums)) throw new Error('El archivo no es un respaldo de VinyList.')
-      await db.albums.bulkPut(data.albums)
+      const cid = activeCollectionId()
+      await db.albums.bulkPut(data.albums.map((a) => ({ ...a, collectionId: cid })))
       setMsg({ text: `Se importaron ${data.albums.length} discos.` })
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : 'No se pudo importar.', error: true })

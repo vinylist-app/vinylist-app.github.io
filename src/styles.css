@@ -3,7 +3,7 @@
  * Los colores viven en variables: el modo oscuro solo las cambia.
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #f4f2ed;
   --bg-2: #ffffff;
   --card: #ffffff;
@@ -50,8 +50,9 @@
   accent-color: var(--accent);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Modo oscuro: index.html pone la clase `oscuro` según el ajuste del celular o el de la app (lib/theme.ts). */
+:root.oscuro {
+    color-scheme: dark;
     --bg: #0e1a1b;
     --bg-2: #17282a;
     --card: #17282a;
@@ -74,7 +75,6 @@
     --overlay: rgba(5, 20, 21, 0.6);
     --logo-sombra: rgba(5, 20, 21, 0.5);
     --logo-borde: rgba(236, 234, 228, 0.45);
-  }
 }
 
 * { box-sizing: border-box; }

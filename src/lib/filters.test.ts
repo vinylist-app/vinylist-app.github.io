@@ -3,7 +3,7 @@ import { applyFilters, DEFAULT_FILTERS, normalize, sortableArtist } from './filt
 import { formatStars, fromStars, starFill, toStars } from './rating'
 import type { Album } from '../types'
 
-const base = { genres: [], styles: [], tracklist: [], addedAt: '2026-01-01', updatedAt: '2026-01-01' }
+const base = { collectionId: 'local', genres: [], styles: [], tracklist: [], addedAt: '2026-01-01', updatedAt: '2026-01-01' }
 const albums: Album[] = [
   { ...base, id: '1', title: 'Re', artist: 'Café Tacvba', year: 1994, genres: ['Rock'], styles: ['Rock en español'], rating: 8, addedAt: '2026-01-03' },
   { ...base, id: '2', title: 'Abbey Road', artist: 'The Beatles', year: 1969, genres: ['Rock'], rating: 9, addedAt: '2026-01-02' },

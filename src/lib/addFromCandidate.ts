@@ -1,4 +1,4 @@
-import { addAlbum, findDuplicate } from '../db'
+import { addAlbum, findDuplicate, type DuplicateMatch } from '../db'
 import { getRelease } from '../api/discogs'
 import type { Album, ReleaseCandidate } from '../types'
 
@@ -6,7 +6,7 @@ import type { Album, ReleaseCandidate } from '../types'
  * Convierte una edición encontrada en un disco de la colección.
  * Si viene de Discogs, pide la ficha completa (canciones, portada grande).
  */
-export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Album, 'id' | 'addedAt' | 'updatedAt'>> {
+export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Album, 'id' | 'addedAt' | 'updatedAt' | 'collectionId'>> {
   if (c.source === 'discogs') {
     try {
       const d = await getRelease(Number(c.sourceId))
@@ -25,7 +25,9 @@ export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Albu
         thumbUrl: d.thumbUrl ?? c.thumbUrl,
         tracklist: d.tracklist,
         discogsId: Number(c.sourceId),
-        discogsMasterId: c.discogsMasterId,
+        discogsMasterId: c.discogsMasterId ?? d.masterId,
+        musicbrainzArtistId: c.musicbrainzArtistId,
+        musicbrainzReleaseGroupId: c.musicbrainzReleaseGroupId,
       }
     } catch {
       // Si la ficha completa falla, guardamos lo que ya tenemos.
@@ -53,8 +55,16 @@ export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Albu
   }
 }
 
-export async function duplicateOf(c: ReleaseCandidate): Promise<Album | undefined> {
-  return findDuplicate({ discogsId: c.source === 'discogs' ? Number(c.sourceId) : undefined, barcode: c.barcode })
+/** ¿Ya tienen esta edición (same) u otra edición del mismo álbum (other)? */
+export async function duplicateOf(c: ReleaseCandidate): Promise<DuplicateMatch | undefined> {
+  return findDuplicate({
+    discogsId: c.source === 'discogs' ? Number(c.sourceId) : undefined,
+    barcode: c.barcode,
+    discogsMasterId: c.discogsMasterId,
+    musicbrainzReleaseGroupId: c.musicbrainzReleaseGroupId,
+    artist: c.artist,
+    title: c.title,
+  })
 }
 
 export async function addCandidate(c: ReleaseCandidate): Promise<Album> {

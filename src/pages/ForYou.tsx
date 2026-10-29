@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db, newId } from '../db'
+import { addWish, deleteWish } from '../db'
+import { useAlbums, useWishlist } from '../data/hooks'
 import { buildProfile } from '../lib/taste/profile'
 import { rankCandidates, type Suggestion } from '../lib/taste/rank'
 import { generateCandidates, type CandidateRun, type Progress } from '../lib/taste/candidates'
 import { albumKey, decadeLabel } from '../lib/text'
 import { spotifySearchUrl } from '../lib/spotify'
-import { getProfileName } from '../lib/profile'
 import { Cover } from '../components/AlbumCard'
 import { SpotifyIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
@@ -22,8 +21,8 @@ function ageLabel(iso?: string): string | null {
 }
 
 export function ForYou() {
-  const albums = useLiveQuery(() => db.albums.toArray(), [])
-  const wishlist = useLiveQuery(() => db.wishlist.toArray(), []) ?? []
+  const albums = useAlbums()
+  const wishlist = useWishlist() ?? []
   const profile = useMemo(() => buildProfile(albums ?? []), [albums])
   const wishedKeys = useMemo(() => new Set(wishlist.map((w) => albumKey(w.artist, w.title))), [wishlist])
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
@@ -69,11 +68,10 @@ export function ForYou() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, albums === undefined])
 
-  const me = getProfileName()
   async function toggleWish(s: Suggestion) {
     const existing = wishlist.find((w) => albumKey(w.artist, w.title) === s.key)
-    if (existing) await db.wishlist.delete(existing.id)
-    else await db.wishlist.add({ id: newId(), title: s.title, artist: s.artist, year: s.year, coverUrl: s.coverUrl ?? s.thumbUrl, wantedBy: me, addedAt: new Date().toISOString() })
+    if (existing) await deleteWish(existing.id)
+    else await addWish({ title: s.title, artist: s.artist, year: s.year, coverUrl: s.coverUrl ?? s.thumbUrl, thumbUrl: s.thumbUrl, discogsMasterId: s.discogsMasterId, musicbrainzReleaseGroupId: s.musicbrainzReleaseGroupId })
   }
 
   if (albums === undefined) return <main className="page"><p className="muted">Cargando…</p></main>

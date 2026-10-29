@@ -36,7 +36,7 @@ export function Search() {
       if (!force) {
         const existing = await duplicateOf(c)
         if (existing) {
-          setDup({ album: existing, candidate: c })
+          setDup({ album: existing.album, candidate: c })
           return
         }
       }

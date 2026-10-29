@@ -4,7 +4,7 @@ import { rankCandidates, type Candidate } from './rank'
 import type { Album } from '../../types'
 
 const now = new Date('2026-10-12T00:00:00Z')
-const base = { tracklist: [], updatedAt: '2026-01-01' }
+const base = { collectionId: 'local', tracklist: [], updatedAt: '2026-01-01' }
 const album = (o: Partial<Album> & { id: string; title: string; artist: string }): Album => ({
   genres: [], styles: [], addedAt: '2026-09-01', ...base, ...o,
 })

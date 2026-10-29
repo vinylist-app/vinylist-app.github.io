@@ -54,7 +54,7 @@ export function Scan() {
       // Aviso de duplicado: si cualquiera de las ediciones ya está en la colección.
       for (const c of found) {
         const d = await duplicateOf(c)
-        if (d) { setDup(d); break }
+        if (d) { setDup(d.album); break }
       }
       setPhase('results')
     } catch (err) {

@@ -1,22 +1,49 @@
 import type { ReleaseCandidate, Track } from '../types'
+import { getSession } from '../session'
 
 /**
  * Cliente de la API de Discogs (https://www.discogs.com/developers).
  * Límite: 60 peticiones por minuto autenticado. Las imágenes solo llegan autenticado.
  *
- * En desarrollo se usa el token personal de .env. En producción las llamadas
- * pasan por la función `discogs` de Supabase para que el token no viaje al celular.
+ * El token personal es gratis (discogs.com/settings/developers). Vive en la
+ * colección de la nube (solo lo leen sus miembros) o en este celular; nunca en el código.
  */
 const BASE = 'https://api.discogs.com'
-const USER_AGENT = 'VinyList/0.1 (app familiar de vinilos)'
+const USER_AGENT = 'VinyList/0.2 (app familiar de vinilos)'
+const LOCAL_TOKEN_KEY = 'vinylist.discogsToken'
+
+export function localDiscogsToken(): string | undefined {
+  try {
+    return localStorage.getItem(LOCAL_TOKEN_KEY) || undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function setLocalDiscogsToken(t: string): void {
+  try {
+    if (t.trim()) localStorage.setItem(LOCAL_TOKEN_KEY, t.trim())
+    else localStorage.removeItem(LOCAL_TOKEN_KEY)
+  } catch {
+    // Sin almacenamiento.
+  }
+}
 
 function token(): string | undefined {
-  return import.meta.env.VITE_DISCOGS_TOKEN || undefined
+  return getSession().collection?.discogsToken || localDiscogsToken() || import.meta.env.VITE_DISCOGS_TOKEN || undefined
 }
 
 export function discogsConfigured(): boolean {
-  // Cuando exista la función de Supabase (v0.2) también contará como configurado.
   return Boolean(token())
+}
+
+/** Comprueba un token contra Discogs (quién es el dueño). */
+export async function checkToken(t: string): Promise<string> {
+  const res = await fetch(`${BASE}/oauth/identity`, { headers: { 'User-Agent': USER_AGENT, Authorization: `Discogs token=${t.trim()}` }, signal: AbortSignal.timeout(15000) })
+  if (res.status === 401) throw new Error('Discogs no reconoce ese token. Cópialo completo desde discogs.com/settings/developers.')
+  if (!res.ok) throw new Error(`Discogs respondió ${res.status}`)
+  const d = (await res.json()) as { username?: string }
+  return d.username ?? 'tu cuenta'
 }
 
 async function get<T>(path: string, params: Record<string, string | number | undefined>): Promise<T> {
@@ -85,6 +112,7 @@ function toCandidate(r: SearchResult): ReleaseCandidate {
     genres: r.genre ?? [],
     styles: r.style ?? [],
     discogsMasterId: r.master_id || undefined,
+    community: r.community ? { have: r.community.have, want: r.community.want } : undefined,
   }
 }
 
@@ -155,6 +183,7 @@ export async function searchByText(q: string): Promise<ReleaseCandidate[]> {
 
 interface ReleaseDetail {
   id: number
+  master_id?: number
   title: string
   year?: number
   country?: string
@@ -169,6 +198,7 @@ interface ReleaseDetail {
 }
 
 export interface ReleaseDetails {
+  masterId?: number
   title: string
   artist: string
   year?: number
@@ -194,6 +224,7 @@ export async function getRelease(id: number): Promise<ReleaseDetails> {
         .join(' ')
     : undefined
   return {
+    masterId: r.master_id || undefined,
     title: r.title,
     artist: cleanArtist(r.artists?.map((a) => a.name).join(', ') ?? 'Varios'),
     year: r.year || undefined,
