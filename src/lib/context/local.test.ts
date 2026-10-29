@@ -46,7 +46,7 @@ describe('lo que cuenta la colección', () => {
     expect(facts.map((f) => f.id)).toEqual(['artista', 'genero', 'parecidos', 'decada'])
     expect(facts[0]).toMatchObject({ icon: '1.º', title: 'Sería tu primer disco de Fleetwood Mac.', source: 'colección' })
     expect(facts[0].detail).toBeUndefined()
-    expect(facts[1].title).toBe('Ya tienes 4 de Rock; este sería el 5.º')
+    expect(facts[1].title).toBe('Ya tienes 4 de Rock; este sería el 5.º.')
     expect(facts[1].detail).toBe('Uno de ellos es Soft Rock.')
     expect(facts[2].title).toBe('Va con tres que ya tienes.')
     expect(facts[2].detail).toBe('Harvest, The Dark Side of the Moon y Hotel California: rock de los setenta.')
@@ -72,6 +72,19 @@ describe('lo que cuenta la colección', () => {
   it('no compara el disco consigo mismo (otra edición ya en la colección)', () => {
     const facts = localFacts(disc({ title: 'Harvest', artist: 'Neil Young', year: 1972, genres: ['Rock'] }), collection, [], profile, { now })
     expect(facts[0].title).toBe('Sería tu primer disco de Neil Young.')
+  })
+  it('si el disco ya es suyo, habla de lo que ya hay en vez de lo que faltaría', () => {
+    const facts = localFacts(disc({ title: 'Harvest', artist: 'Neil Young', year: 1972, genres: ['Rock'], styles: ['Folk Rock'] }), collection, [], profile, { now, alreadyOwned: true })
+    expect(facts[0].title).toBe('Es tu único disco de Neil Young.')
+    expect(facts[1].title).toBe('Es tu único disco de Folk Rock.')
+    expect(facts[1].detail).toBe('Tienes 3 más de Rock.')
+    const more = [...collection, album({ id: '6', title: 'On the Beach', artist: 'Neil Young', year: 1974, genres: ['Rock'] })]
+    const two = localFacts(disc({ title: 'Harvest', artist: 'Neil Young', year: 1972, genres: ['Rock'] }), more, [], buildProfile(more, now), { now, alreadyOwned: true })
+    expect(two[0].title).toBe('También tienes «On the Beach» de Neil Young.')
+    expect(two[1].title).toBe('Tienes 4 más de Rock.')
+    const jazz = localFacts(disc({ title: 'Kind of Blue', artist: 'Miles Davis', year: 1959, genres: ['Jazz'] }), collection, [], profile, { now, alreadyOwned: true })
+    expect(jazz[1].title).toBe('Es tu único disco de Jazz.')
+    expect(facts.map((f) => f.title).join(' ')).not.toMatch(/Sería|faltaba/)
   })
   it('no habla de "Various" como artista', () => {
     const facts = localFacts(disc({ title: 'Disco Fever', artist: 'Various', year: 1978, genres: ['Funk / Soul'] }), collection, [], profile, { now })
@@ -104,6 +117,10 @@ describe('lo que cuenta la colección', () => {
     expect(p?.title).toBe('Va con uno que ya tienes.')
     expect(p?.detail).toBe('Harvest: Neil Young suena parecido a Crosby, Stills & Nash, según ListenBrainz.')
     expect(p?.source).toBe('ListenBrainz')
+    // Dos discos del mismo artista parecido: el verbo sigue en singular.
+    const more = [...collection, album({ id: '6', title: 'After the Gold Rush', artist: 'Neil Young', year: 1970, genres: ['Rock'] })]
+    const two = localFacts(disc({ title: 'Déjà Vu', artist: 'Crosby, Stills & Nash', year: 1970, genres: ['Folk'] }), more, [], buildProfile(more, now), { similarTo: seeds, now })
+    expect(two.find((f) => f.id === 'parecidos')?.detail).toBe('After the Gold Rush y Harvest: Neil Young suena parecido a Crosby, Stills & Nash, según ListenBrainz.')
   })
 })
 

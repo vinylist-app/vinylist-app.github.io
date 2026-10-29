@@ -57,13 +57,20 @@ export function looksLikeCompilation(title: string): boolean {
   return /(greatest hits|best of|very best|anthology|collection|grandes [eé]xitos|lo mejor de|live at|en vivo|in concert|box set)/i.test(title)
 }
 
-/** "Hoy" si es la fecha de hoy; si no, "12 jul 2026". Regresa el texto tal cual si no se puede leer. */
+/** "2026-07-12" en la zona horaria del celular. */
+function localDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * "Hoy" si es la fecha de hoy; si no, "12 jul 2026". Regresa el texto tal cual si no se puede leer.
+ * Acepta una fecha sola ("2026-07-12", como la de compra) o una marca de tiempo ISO en UTC
+ * ("2026-07-13T02:00:00Z", como `addedAt`), que se pasa a la hora local antes de comparar.
+ */
 export function purchaseDateLabel(iso: string, now = new Date()): string {
-  const day = iso.slice(0, 10)
-  const d = new Date(`${day}T00:00`)
+  const d = iso.length > 10 ? new Date(iso) : new Date(`${iso}T00:00`)
   if (Number.isNaN(d.getTime())) return iso
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  if (day === today) return 'Hoy'
+  if (localDay(d) === localDay(now)) return 'Hoy'
   return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 

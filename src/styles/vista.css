@@ -28,6 +28,8 @@
 .vista-cuenta { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; }
 .vista-cuenta__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .vista-pill { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+/* En lugar de la pill, mientras no haya cinco discos calificados */
+.vista-cuenta__hint { font-size: 13px; color: var(--text-2); text-align: right; }
 .vista-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .vista-fact { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .vista-fact:first-child { padding-top: 2px; }

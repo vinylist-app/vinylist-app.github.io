@@ -4,7 +4,9 @@ import { trimExtract, wikidataQid } from '../lib/context/pure'
  * Wikidata + Wikipedia, sin clave. Se llega al artículo desde el enlace de
  * Wikidata que MusicBrainz guarda en el grupo de lanzamiento:
  *   Q… → Special:EntityData (sitelinks) → es.wikipedia (o en.) → resumen (REST).
- * Un 404 o un bloqueo de CORS se trata como "no hay artículo", no como error.
+ * Solo un 404 (o la falta de enlace) se trata como "no hay artículo"; un fallo de red,
+ * un tiempo agotado o un 5xx/429 se relanzan para que la caché no guarde un "no" falso
+ * durante 30 días y se vuelva a intentar en la siguiente visita.
  */
 const TIMEOUT_MS = 12000
 
@@ -19,15 +21,12 @@ export interface WikiSummary {
 
 export { wikidataQid }
 
+/** undefined = no existe (404). Cualquier otro fallo (red, tiempo agotado, 5xx, 429) lanza. */
 async function getJson<T>(url: string): Promise<T | undefined> {
-  try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!res.ok) return undefined
-    return (await res.json()) as T
-  } catch {
-    // Sin red, CORS o tiempo agotado: no hay artículo que mostrar.
-    return undefined
-  }
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+  if (res.status === 404) return undefined
+  if (!res.ok) throw new Error(`Wikipedia respondió ${res.status}`)
+  return (await res.json()) as T
 }
 
 interface EntityData {
@@ -56,7 +55,10 @@ export async function wikipediaSummary(lang: 'es' | 'en', title: string): Promis
   return { extract, url: data.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`, lang, title }
 }
 
-/** Del Q de Wikidata al resumen, español primero. null = no hay artículo (se guarda para no volver a preguntar). */
+/**
+ * Del Q de Wikidata al resumen, español primero. null = no hay artículo (se guarda para no
+ * volver a preguntar). Si la red falla a medio camino, lanza: eso no se guarda.
+ */
 export async function summaryForWikidata(qid: string): Promise<WikiSummary | null> {
   const links = await wikidataSitelinks(qid)
   if (links.es) {

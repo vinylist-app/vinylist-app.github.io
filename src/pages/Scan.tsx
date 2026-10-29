@@ -130,7 +130,7 @@ export function Scan() {
           {results.length > 0 ? (
             <>
               <span className="muted">Elige la edición que tienes en la mano</span>
-              <CandidateList candidates={results} onPick={(c) => open(c, results)} />
+              <CandidateList candidates={results} onPick={(c) => open(c, results)} pickLabel="Elegir" />
               <div className="notice" style={{ background: 'transparent', border: '1px dashed var(--line)', color: 'var(--text-2)', fontWeight: 500 }}>¿Tu copia es otra edición? Elígela aquí. Si el disco ya está en la colección, te avisamos antes de repetirlo.</div>
             </>
           ) : (

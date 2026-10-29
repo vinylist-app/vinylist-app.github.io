@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { ReleaseCandidate, Track } from '../types'
+import type { Album, ReleaseCandidate, Track } from '../types'
 import { addWish, cached, deleteWish } from '../db'
 import { useAlbums, useWishlist } from '../data/hooks'
 import { personName, useSession } from '../session'
@@ -31,7 +31,7 @@ export function Preview() {
   const { source = '', sourceId = '' } = useParams()
   const location = useLocation()
   const nav = useNavigate()
-  const { person } = useSession()
+  const { person, collection } = useSession()
   const albums = useAlbums()
   const wishlist = useWishlist()
 
@@ -52,6 +52,7 @@ export function Preview() {
   const [sheet, setSheet] = useState(false)
 
   // Ficha completa de Discogs: canciones, portada grande, master. Guardada 30 días.
+  // El token de la familia llega con la sesión (tras recargar, después del primer render): se vuelve a intentar cuando aparece.
   useEffect(() => {
     setDetails(undefined)
     if (!candidate || candidate.source !== 'discogs' || !discogsConfigured()) { setDetailsState('idle'); return }
@@ -61,7 +62,7 @@ export function Preview() {
       .then((d) => { if (alive) { setDetails(d); setDetailsState('done') } })
       .catch(() => { if (alive) setDetailsState('error') })
     return () => { alive = false }
-  }, [candidate])
+  }, [candidate, collection?.discogsToken])
 
   // El candidato con lo que la ficha completa agregó.
   const merged = useMemo<ReleaseCandidate | undefined>(() => {
@@ -133,8 +134,9 @@ export function Preview() {
     setError(null)
     try {
       const album = await addCandidate(c)
+      // Si quien lo quería era yo, sale de Deseos; la ficha lo avisa y ofrece deshacerlo.
       if (myWish) await deleteWish(myWish.id)
-      nav(`/album/${album.id}`, { replace: true, state: { justAdded: true } })
+      nav(`/album/${album.id}`, { replace: true, state: { justAdded: true, removedWish: myWish, from: state?.from } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo agregar. Intenta de nuevo.')
       setAdding(false)
@@ -185,7 +187,7 @@ export function Preview() {
       {owned && (
         <div className="notice vista-owned">
           <span>{ownedLine(owned.album, owned.kind, person.uid)}</span>
-          <Link to={`/album/${owned.album.id}`} className="btn btn--sm">Ver mi copia</Link>
+          <Link to={`/album/${owned.album.id}`} state={{ from: 'Vista previa' }} className="btn btn--sm">Ver mi copia</Link>
         </div>
       )}
 
@@ -237,7 +239,7 @@ export function Preview() {
       <div className="vista-bar">
         <div className="vista-bar__inner">
           {owned ? (
-            <Link to={`/album/${owned.album.id}`} className="btn btn--primary">Ver mi copia</Link>
+            <Link to={`/album/${owned.album.id}`} state={{ from: 'Vista previa' }} className="btn btn--primary">Ver mi copia</Link>
           ) : (
             <button type="button" className="btn btn--primary" onClick={add} disabled={adding}><PlusIcon width={20} height={20} /> {adding ? 'Agregando…' : 'Agregar a mi colección'}</button>
           )}
@@ -268,11 +270,13 @@ export function Preview() {
   )
 }
 
-/** "Ya lo tienes: lo agregaste el 12 mar 2026 · 4.5 estrellas" (o quién de la familia lo tiene). */
-function ownedLine(album: { addedAt: string; addedBy?: string; rating?: number }, kind: 'same' | 'other', me: string): string {
+/** "Ya lo tienes: lo agregaste el 12 mar 2026 · 4.5 estrellas" (o quién de la familia lo tiene, con SU calificación). */
+function ownedLine(album: Pick<Album, 'addedAt' | 'addedBy' | 'rating' | 'ratings'>, kind: 'same' | 'other', me: string): string {
   const date = purchaseDateLabel(album.addedAt)
-  const stars = album.rating ? `${formatStars(album.rating)} ${formatStars(album.rating) === '1' ? 'estrella' : 'estrellas'}` : 'Sin calificar'
   const other = album.addedBy && album.addedBy !== me ? personName(album.addedBy) : undefined
+  // `rating` es la de quien mira; la de otra persona está en `ratings` por uid.
+  const rating = other ? album.ratings?.[album.addedBy!]?.rating : album.rating
+  const stars = rating ? `${formatStars(rating)} ${formatStars(rating) === '1' ? 'estrella' : 'estrellas'}` : 'Sin calificar'
   const what = kind === 'same' ? 'lo' : 'otra edición'
   if (other) return kind === 'same' ? `Ya lo tiene ${other}: lo agregó el ${date} · ${stars}` : `${other} ya tiene otra edición: la agregó el ${date} · ${stars}`
   return kind === 'same' ? `Ya lo tienes: lo agregaste el ${date} · ${stars}` : `Ya tienes ${what}: la agregaste el ${date} · ${stars}`

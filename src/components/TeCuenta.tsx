@@ -17,6 +17,8 @@ export type RemoteStatus = 'idle' | 'loading' | 'done' | 'offline'
 export interface TeCuentaData {
   facts: Fact[]
   verdict?: Verdict
+  /** Sin veredicto por falta de discos calificados: se explica en vez de callar. */
+  verdictHint?: boolean
   status: RemoteStatus
   /** "tu colección · MusicBrainz · Wikipedia…", solo las que se usaron. */
   sources: string[]
@@ -56,6 +58,12 @@ export function useTeCuenta(disc: DiscRef | undefined, albums: Album[] | undefin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discKey, profile])
 
+  // Lo que las fuentes dicen depende de qué discos del artista ya tienen ("te faltan N de M"),
+  // así que el trabajo remoto se repite si eso cambia: por ejemplo, al recargar con cuenta, la
+  // colección local vacía llega primero y la de la familia un instante después.
+  const ownedOfArtist = useMemo(() => (disc && albums ? otherAlbums(disc, albums).filter((a) => artistKey(a.artist) === artistKey(disc.artist)) : []), [disc, albums])
+  const ownedKey = ownedOfArtist.map((a) => a.id).sort().join('|')
+
   // Lo remoto: se pide una vez por disco; si no hay internet, se reintenta al volver.
   useEffect(() => {
     if (!disc || !albums) return
@@ -68,7 +76,6 @@ export function useTeCuenta(disc: DiscRef | undefined, albums: Album[] | undefin
     }
     setStatus('loading')
     const ctrl = new AbortController()
-    const ownedOfArtist = otherAlbums(disc, albums).filter((a) => artistKey(a.artist) === artistKey(disc.artist))
     remoteFacts(disc, {
       ownedOfArtist,
       alreadyOwned: opts.alreadyOwned,
@@ -79,24 +86,27 @@ export function useTeCuenta(disc: DiscRef | undefined, albums: Album[] | undefin
       .finally(() => { if (!ctrl.signal.aborted) setStatus('done') })
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discKey, albums === undefined, retry])
+  }, [discKey, albums === undefined, retry, ownedKey, opts.alreadyOwned])
 
   return useMemo<TeCuentaData>(() => {
     if (!disc || !albums) return { facts: [], status: 'idle', sources: [] }
-    const local = opts.withLocal === false ? [] : localFacts(disc, albums, wishlist ?? [], profile, { me: opts.me, similarTo })
+    const local = opts.withLocal === false ? [] : localFacts(disc, albums, wishlist ?? [], profile, { me: opts.me, similarTo, alreadyOwned: opts.alreadyOwned })
     const facts = mergeFacts(local, remote)
     const verdict = opts.withVerdict === false ? undefined : verdictFor(disc, profile)
-    return { facts, verdict, status, sources: sourcesOf(facts) }
-  }, [disc, albums, wishlist, profile, similarTo, remote, status, opts.me, opts.withVerdict, opts.withLocal])
+    // Con menos de cinco discos calificados no hay veredicto; se avisa (salvo si el disco ya es suyo).
+    const verdictHint = opts.withVerdict !== false && !opts.alreadyOwned && verdict === undefined && profile.ratedCount < 5
+    return { facts, verdict, verdictHint, status, sources: sourcesOf(facts) }
+  }, [disc, albums, wishlist, profile, similarTo, remote, status, opts.me, opts.withVerdict, opts.withLocal, opts.alreadyOwned])
 }
 
 export function TeCuentaCard({ data }: { data: TeCuentaData }) {
-  const { facts, verdict, status, sources } = data
+  const { facts, verdict, verdictHint, status, sources } = data
   return (
     <section className="card vista-cuenta" aria-labelledby="tecuenta-h">
       <div className="vista-cuenta__head">
         <h3 id="tecuenta-h" className="eyebrow">Te cuenta</h3>
         {verdict && <span className="vista-pill">{verdict}</span>}
+        {!verdict && verdictHint && <span className="vista-cuenta__hint">Con unos discos más calificados te diré si va con tus gustos.</span>}
       </div>
 
       {facts.length === 0 && status !== 'loading' && (
