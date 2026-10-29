@@ -33,11 +33,11 @@
 .cal-sheet__nav { align-self: stretch; display: flex; justify-content: space-between; align-items: center; margin: 0 -10px; }
 .cal-sheet__nav .btn { max-width: 60%; }
 .cal-sheet__nav .btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-sheet__cover { width: 120px; height: 120px; border-radius: 3px; object-fit: cover; background: var(--card-2); border: 1.5px solid var(--accent); }
+.cal-sheet__cover { flex: none; width: 120px; height: 120px; border-radius: 3px; object-fit: cover; background: var(--card-2); border: 1.5px solid var(--accent); }
 .cal-sheet__cover.cover--placeholder { font-size: 18px; padding: 10px; align-items: flex-end; }
 .cal-sheet h2 { font-size: 26px; }
 .cal-sheet .cal-slider { margin-top: 6px; }
-.cal-medal { width: 80px; height: 80px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 28px; letter-spacing: -0.02em; font-variation-settings: 'opsz' 96; box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 4.5px var(--accent); margin: 4px 0; }
+.cal-medal { flex: none; width: 80px; height: 80px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 28px; letter-spacing: -0.02em; font-variation-settings: 'opsz' 96; box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 4.5px var(--accent); margin: 4px 0; }
 /* Sin calificar: círculo punteado con la palabra, sin número ni guion (spec §2). */
 .cal-medal--empty { background: transparent; color: var(--accent); border: 1.5px dashed var(--accent); box-shadow: none; font-family: var(--body); font-size: 13px; font-weight: 600; letter-spacing: 0; line-height: 1.15; padding: 0 10px; font-variation-settings: normal; }
 .cal-sheet__help { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text); max-width: 340px; }
@@ -45,7 +45,7 @@
 .cal-sheet__hint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-2); max-width: 340px; }
 /* Pegajoso: si la hoja desborda, el botón sigue a la vista. En reposo queda en su sitio porque el desplazamiento
    coincide con el relleno inferior del panel; el halo del color del fondo separa el texto que pasa por debajo. */
-.cal-sheet__save { align-self: stretch; margin-top: 8px; position: sticky; bottom: calc(24px + var(--safe-bottom)); z-index: 1; box-shadow: 0 0 0 6px var(--bg-2); }
+.cal-sheet__save { align-self: stretch; margin-top: 8px; position: sticky; bottom: 0; z-index: 1; box-shadow: 0 0 0 6px var(--bg-2); }
 
 /* ---------- Ficha: fila de calificación ---------- */
 .cal-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 12px 0; margin: 0; border: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); text-align: left; font: inherit; }
