@@ -1,20 +1,38 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteAlbum, updateAlbum } from '../db'
+import { personName, useSession } from '../session'
 import { StarRating } from '../components/StarRating'
+import { RateSheet } from '../components/RateSheet'
 import { Cover } from '../components/AlbumCard'
-import { BackIcon, DiscIcon, SpotifyIcon } from '../components/Icons'
+import { BackIcon, DiscIcon, SpotifyIcon, StarPath } from '../components/Icons'
 import { formatStars } from '../lib/rating'
+import { averageOf, formatAverage } from '../lib/starSlider'
 import { priceLabel, purchaseDateLabel } from '../lib/text'
 import { resolveSpotifyAlbumId, spotifyUrlFor } from '../lib/spotifyLink'
 import { CONDITIONS, type Album, type Condition } from '../types'
+import '../styles/calificar.css'
 
+/** Ficha del disco (pantalla 7): portada, calificación, datos de tu copia, canciones y enlaces. */
 export function AlbumPage() {
   const { id = '' } = useParams()
   const nav = useNavigate()
+  const location = useLocation()
   const album = useLiveQuery(() => db.albums.get(id), [id])
   const [editing, setEditing] = useState(false)
+  const [rating, setRating] = useState(false)
+  // La vista previa manda `justAdded` al agregar; el aviso se va solo a los 3 s.
+  const [justAdded, setJustAdded] = useState<boolean>(() => Boolean((location.state as { justAdded?: boolean } | null)?.justAdded))
+
+  useEffect(() => {
+    if (!justAdded) return
+    // Se limpia el estado de la ruta para que el aviso no vuelva al regresar a esta pantalla.
+    nav(location.pathname, { replace: true, state: null })
+    const t = setTimeout(() => setJustAdded(false), 3000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justAdded])
 
   // Busca una sola vez el ID exacto de Spotify; la ficha se actualiza sola cuando llega.
   useEffect(() => {
@@ -34,42 +52,36 @@ export function AlbumPage() {
         <button type="button" className="btn btn--sm btn--ghost" onClick={() => nav(-1)}><BackIcon width={20} height={20} /> Colección</button>
         <button type="button" className="btn btn--sm btn--ghost" onClick={() => setEditing(true)}>Editar</button>
       </div>
+      {justAdded && <div className="notice cal-notice" role="status">Listo, ya está en tu colección</div>}
       <div className="hero">
         <Cover src={album.coverUrl ?? album.thumbUrl} title={album.title} className="hero__img" />
       </div>
 
       <div className="stack" style={{ gap: 4 }}>
         <h1 style={{ fontSize: 28 }}>{album.title}</h1>
-        <span className="muted" style={{ fontSize: 15 }}>{[album.artist, album.year, album.label].filter(Boolean).join(' · ')}</span>
+        <span className="muted" style={{ fontSize: 15 }}>{[album.artist, album.year].filter(Boolean).join(' · ')}</span>
         <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
           {[...album.genres, ...album.styles.slice(0, 2), album.format, album.country].filter(Boolean).map((t) => <span className="tag" key={t}>{t}</span>)}
         </div>
       </div>
 
-      <section className="card stack" aria-labelledby="rating-h">
-        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span id="rating-h" className="eyebrow">Tu calificación · opcional</span>
-          {album.rating ? <span className="rating-big">{formatStars(album.rating)} / 5</span> : null}
-        </div>
-        <StarRating value={album.rating} onChange={(r) => updateAlbum(album.id, { rating: r })} />
-        <span className="muted" style={{ fontSize: 13 }}>{album.rating ? 'Toca la mitad izquierda de una estrella para media estrella.' : 'Sin calificar. Califícalo cuando quieras.'}</span>
+      <section className="stack" style={{ gap: 6 }} aria-labelledby="rating-h">
+        <RatingRow album={album} onOpen={() => setRating(true)} />
+        <FamilyAverage album={album} />
       </section>
 
-      <div className="facts facts--rows">
-        <div className="fact"><span>Estado disco / funda</span><span>{album.mediaCondition ?? '—'} / {album.sleeveCondition ?? '—'}</span></div>
-        <div className="fact"><span>Ubicación</span><span>{album.location || '—'}</span></div>
-        <div className="fact"><span>Compra</span><span>{[album.purchaseDate && purchaseDateLabel(album.purchaseDate), album.purchasePrice !== undefined ? priceLabel(album.purchasePrice) : undefined, album.purchasePlace].filter(Boolean).join(' · ') || '—'}</span></div>
-        <div className="fact"><span>Catálogo / código</span><span className="mono">{[album.catalogNumber, album.barcode].filter(Boolean).join(' · ') || '—'}</span></div>
-      </div>
+      <CopyFacts album={album} onComplete={() => setEditing(true)} />
 
       {album.notes && <p className="card" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{album.notes}</p>}
 
       {album.tracklist.length > 0 && (
         <section className="stack" aria-labelledby="tracks-h">
           <h3 id="tracks-h" className="eyebrow">Canciones</h3>
-          {album.tracklist.map((t, i) => (
-            <div className="track" key={`${t.position}-${i}`}><span>{t.position}</span><span>{t.title}</span><span>{t.duration}</span></div>
-          ))}
+          <div className="cal-tracks">
+            {album.tracklist.map((t, i) => (
+              <div className="track" key={`${t.position}-${i}`}><span>{t.position}</span><span>{t.title}</span><span>{t.duration}</span></div>
+            ))}
+          </div>
         </section>
       )}
 
@@ -80,7 +92,70 @@ export function AlbumPage() {
       <button type="button" className="btn btn--sm btn--link" style={{ alignSelf: 'center' }} onClick={async () => { if (confirm(`¿Quitar "${album.title}" de la colección?`)) { await deleteAlbum(album.id); nav('/', { replace: true }) } }}>Quitar de la colección</button>
 
       {editing && <EditSheet album={album} onClose={() => setEditing(false)} />}
+      {rating && <RateSheet album={album} onClose={() => setRating(false)} />}
     </main>
+  )
+}
+
+/** Fila "Tu calificación": toda la fila abre la hoja para calificar deslizando. */
+function RatingRow({ album, onOpen }: { album: Album; onOpen: () => void }) {
+  const has = Boolean(album.rating)
+  return (
+    <button type="button" className="cal-row" onClick={onOpen} aria-describedby="rating-text">
+      <span className={`cal-row__disc ${has ? 'cal-row__disc--on' : ''}`} aria-hidden="true">
+        <svg width={26} height={26} viewBox="0 0 24 24" fill={has ? 'var(--star)' : 'none'} stroke="var(--star-empty)" strokeWidth={1.5} strokeLinejoin="round"><StarPath /></svg>
+      </span>
+      <span className="cal-row__body">
+        <span id="rating-h" className="eyebrow">Tu calificación · opcional</span>
+        <StarRating value={album.rating} size={24} />
+        <span id="rating-text" className="cal-row__text">{has ? `${formatStars(album.rating)} / 5 · Desliza para cambiarla` : 'Sin calificar. Califícalo cuando quieras.'}</span>
+      </span>
+    </button>
+  )
+}
+
+/** Promedio de la familia, solo cuando calificaron dos personas o más. */
+function FamilyAverage({ album }: { album: Album }) {
+  // Se suscribe a la sesión para que los nombres se actualicen si cambian los miembros.
+  useSession()
+  const { avg, count } = averageOf(album.ratings)
+  if (count < 2) return null
+  const people = Object.entries(album.ratings ?? {})
+    .filter(([, r]) => r.rating >= 1 && r.rating <= 10)
+    .sort((a, b) => b[1].rating - a[1].rating)
+    .map(([uid, r]) => `${personName(uid)} ${formatStars(r.rating)}`)
+  return (
+    <div className="cal-family">
+      <span>Promedio de la familia <b>{formatAverage(avg)}</b> · {count} calificaciones</span>
+      {people.length > 0 && <span>{people.join(' · ')}</span>}
+    </div>
+  )
+}
+
+/** Datos de tu copia: solo las filas con dato. Si falta algo, una fila para completarlo. */
+function CopyFacts({ album, onComplete }: { album: Album; onComplete: () => void }) {
+  const rows: { label: string; value: string; mono?: boolean }[] = []
+  if (album.mediaCondition && album.sleeveCondition) rows.push({ label: 'Estado disco / funda', value: `${album.mediaCondition} / ${album.sleeveCondition}` })
+  else if (album.mediaCondition) rows.push({ label: 'Estado del disco', value: album.mediaCondition })
+  else if (album.sleeveCondition) rows.push({ label: 'Estado de la funda', value: album.sleeveCondition })
+  if (album.location) rows.push({ label: 'Ubicación', value: album.location })
+  const purchase = [album.purchaseDate && purchaseDateLabel(album.purchaseDate), album.purchasePrice !== undefined ? priceLabel(album.purchasePrice) : undefined, album.purchasePlace].filter(Boolean).join(' · ')
+  if (purchase) rows.push({ label: 'Compra', value: purchase })
+  if (album.label || album.catalogNumber) rows.push({ label: 'Edición', value: [album.label, album.year, album.catalogNumber].filter(Boolean).join(' · ') })
+  if (album.barcode) rows.push({ label: 'Código', value: album.barcode, mono: true })
+
+  const incomplete = !album.mediaCondition || !album.sleeveCondition || !album.location || !purchase
+  if (rows.length === 0 && !incomplete) return null
+
+  return (
+    <div className="facts facts--rows cal-facts">
+      {rows.map((r) => (
+        <div className="fact" key={r.label}><span>{r.label}</span><span className={r.mono ? 'mono' : undefined}>{r.value}</span></div>
+      ))}
+      {incomplete && (
+        <button type="button" className="fact cal-fact-btn" onClick={onComplete}><span>Completar datos de tu copia</span><span aria-hidden="true">›</span></button>
+      )}
+    </div>
   )
 }
 
