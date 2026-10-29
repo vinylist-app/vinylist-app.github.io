@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app'
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth'
-import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore'
+import { connectFirestoreEmulator, initializeFirestore, memoryLocalCache, persistentLocalCache, persistentMultipleTabManager, type Firestore } from 'firebase/firestore'
 import rawConfig from './firebase-config.json'
 
 /**
@@ -42,7 +42,9 @@ export function getDb(): Firestore {
   if (!firestore) {
     firestore = initializeFirestore(getApp(), {
       // Los datos se guardan en el celular y las escrituras esperan a que haya internet.
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      // En el navegador, caché persistente compartida entre pestañas (funciona sin internet);
+      // fuera de él (pruebas en Node) el SDK no la soporta y usamos memoria.
+      localCache: typeof window === 'undefined' ? memoryLocalCache() : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
       ignoreUndefinedProperties: true,
     })
     if (EMULATOR) connectFirestoreEmulator(firestore, EMULATOR_HOST, 8080)

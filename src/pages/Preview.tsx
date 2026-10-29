@@ -134,7 +134,7 @@ export function Preview() {
     try {
       const album = await addCandidate(c)
       if (myWish) await deleteWish(myWish.id)
-      nav(`/album/${album.id}`, { replace: true })
+      nav(`/album/${album.id}`, { replace: true, state: { justAdded: true } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo agregar. Intenta de nuevo.')
       setAdding(false)

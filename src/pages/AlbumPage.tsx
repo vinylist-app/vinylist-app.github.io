@@ -5,6 +5,7 @@ import { db, deleteAlbum, updateAlbum } from '../db'
 import { personName, useSession } from '../session'
 import { StarRating } from '../components/StarRating'
 import { RateSheet } from '../components/RateSheet'
+import { AboutAlbum } from '../components/AboutAlbum'
 import { Cover } from '../components/AlbumCard'
 import { BackIcon, DiscIcon, SpotifyIcon, StarPath } from '../components/Icons'
 import { formatStars } from '../lib/rating'
@@ -85,6 +86,8 @@ export function AlbumPage() {
         </section>
       )}
 
+      <AboutSection album={album} />
+
       <div className="album-actions">
         <a className="btn btn--sm" href={spotify} target="_blank" rel="noreferrer"><SpotifyIcon width={18} height={18} className="spotify" /> Escuchar en Spotify</a>
         {discogs && <a className="btn btn--sm btn--primary" href={discogs} target="_blank" rel="noreferrer"><DiscIcon width={18} height={18} /> Ver en Discogs</a>}
@@ -94,6 +97,27 @@ export function AlbumPage() {
       {editing && <EditSheet album={album} onClose={() => setEditing(false)} />}
       {rating && <RateSheet album={album} onClose={() => setRating(false)} />}
     </main>
+  )
+}
+
+/**
+ * "Sobre el disco": la misma tarjeta "Te cuenta" de la vista previa, plegada para no
+ * alargar la ficha ni consultar las fuentes hasta que la persona quiera leerla.
+ * Aquí no hay veredicto ni líneas de "en tu colección": el disco ya es tuyo.
+ */
+function AboutSection({ album }: { album: Album }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="stack" style={{ gap: 8 }} aria-labelledby="about-h">
+      <button type="button" className="cal-row" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="about-body">
+        <span className="cal-row__body cal-row__body--grow">
+          <span id="about-h" className="eyebrow">Sobre el disco</span>
+          <span className="cal-row__text">{open ? 'Lo que cuentan tu colección y las fuentes' : 'Historia, discografía y qué tan conocido es'}</span>
+        </span>
+        <span aria-hidden="true" className={`cal-row__chevron ${open ? 'cal-row__chevron--open' : ''}`}>›</span>
+      </button>
+      {open && <div id="about-body"><AboutAlbum album={album} /></div>}
+    </section>
   )
 }
 

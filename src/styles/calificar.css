@@ -44,6 +44,10 @@
 .cal-row__disc--on { border-style: solid; background: var(--card-2); }
 .cal-row__body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .cal-row__text { font-size: 13px; color: var(--text-2); }
+.cal-row__body--grow { flex: 1; }
+.cal-row__chevron { flex: none; width: 28px; text-align: center; font-size: 22px; line-height: 1; color: var(--text-2); transition: transform 0.2s; }
+.cal-row__chevron--open { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .cal-row__chevron { transition: none; } }
 .cal-family { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-2); padding: 0 0 4px; }
 .cal-family b { color: var(--text); font-weight: 600; }
 
