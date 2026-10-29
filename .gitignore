@@ -5,3 +5,6 @@ dev-dist
 .env.local
 *.local
 .DS_Store
+
+# Árboles de trabajo temporales de las herramientas de Claude
+.claude/worktrees/
