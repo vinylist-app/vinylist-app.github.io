@@ -1,15 +1,16 @@
-import { addAlbum, findDuplicate, type DuplicateMatch } from '../db'
+import { addAlbum, cached, findDuplicate, type DuplicateMatch } from '../db'
 import { getRelease } from '../api/discogs'
 import type { Album, ReleaseCandidate } from '../types'
 
 /**
  * Convierte una edición encontrada en un disco de la colección.
- * Si viene de Discogs, pide la ficha completa (canciones, portada grande).
+ * Si viene de Discogs, pide la ficha completa (canciones, portada grande) con la misma
+ * llave de caché que la vista previa, así no se vuelve a pedir lo que ya se mostró.
  */
 export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Album, 'id' | 'addedAt' | 'updatedAt' | 'collectionId'>> {
   if (c.source === 'discogs') {
     try {
-      const d = await getRelease(Number(c.sourceId))
+      const d = await cached(`dg:release:${c.sourceId}`, 30, () => getRelease(Number(c.sourceId)))
       return {
         title: d.title,
         artist: d.artist,

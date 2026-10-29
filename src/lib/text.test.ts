@@ -39,6 +39,12 @@ describe('fechas y precios de compra', () => {
   it('deja pasar una fecha ilegible', () => {
     expect(purchaseDateLabel('ayer')).toBe('ayer')
   })
+  it('una marca de tiempo en UTC se lee en hora local: lo agregado esta noche sigue siendo Hoy', () => {
+    const tonight = new Date(2026, 9, 29, 20, 0, 0)
+    expect(purchaseDateLabel(tonight.toISOString(), tonight)).toBe('Hoy')
+    const tomorrow = new Date(2026, 9, 30, 9)
+    expect(purchaseDateLabel(tonight.toISOString(), tomorrow)).toMatch(/29 oct 2026/)
+  })
   it('formatea precios en pesos', () => {
     expect(priceLabel(650)).toBe('$650')
     expect(priceLabel(1250)).toBe('$1,250')

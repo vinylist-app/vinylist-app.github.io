@@ -16,6 +16,8 @@ export interface LocalOptions {
   me?: string
   /** Artistas de la colección que suenan parecido al del disco (de la caché de ListenBrainz). */
   similarTo?: string[]
+  /** El disco ya está en la colección: las líneas de artista y género hablan de lo que ya hay, no de lo que faltaría. */
+  alreadyOwned?: boolean
   now?: Date
 }
 
@@ -77,15 +79,24 @@ export function localFacts(disc: DiscRef, albums: Album[], wishlist: WishlistIte
   // El nombre del artista como ya está escrito en la colección, si existe ahí.
   const artist = profile.artists.get(artistKey(disc.artist))?.name ?? cleanArtist(disc.artist)
 
+  // Si el disco ya es suyo, "sería tu primer disco" y "este te faltaba" mentirían: se habla de lo que ya hay.
+  const owned = Boolean(opts.alreadyOwned)
+
   // (a) El artista.
   if (!isVariousArtists(disc.artist)) {
     const own = others.filter((a) => artistKey(a.artist) === artistKey(disc.artist)).sort(byYear)
     if (own.length === 0) {
-      facts.push({ id: 'artista', icon: '1.º', title: `Sería tu primer disco de ${artist}.`, source: 'colección' })
+      facts.push(owned
+        ? { id: 'artista', icon: '1.º', title: `Es tu único disco de ${artist}.`, source: 'colección' }
+        : { id: 'artista', icon: '1.º', title: `Sería tu primer disco de ${artist}.`, source: 'colección' })
     } else if (own.length === 1) {
-      facts.push({ id: 'artista', icon: '↑', title: `Ya tienes «${own[0].title}» de ${artist}; este te faltaba.`, source: 'colección' })
+      facts.push(owned
+        ? { id: 'artista', icon: '↑', title: `También tienes «${own[0].title}» de ${artist}.`, source: 'colección' }
+        : { id: 'artista', icon: '↑', title: `Ya tienes «${own[0].title}» de ${artist}; este te faltaba.`, source: 'colección' })
     } else {
-      facts.push({ id: 'artista', icon: '↑', title: `Ya tienes ${own.length} de ${artist}: ${listTitles(own.map((a) => a.title))}. Este te faltaba.`, source: 'colección' })
+      facts.push(owned
+        ? { id: 'artista', icon: '↑', title: `Tienes ${own.length} más de ${artist}: ${listTitles(own.map((a) => a.title))}.`, source: 'colección' }
+        : { id: 'artista', icon: '↑', title: `Ya tienes ${own.length} de ${artist}: ${listTitles(own.map((a) => a.title))}. Este te faltaba.`, source: 'colección' })
     }
   }
 
@@ -95,17 +106,21 @@ export function localFacts(disc: DiscRef, albums: Album[], wishlist: WishlistIte
   if (genre || style) {
     const g = genre ? { label: tagLabel(genre), count: others.filter((a) => hasTag(a, tagKey(genre))).length } : undefined
     const s = style ? { label: tagLabel(style), count: others.filter((a) => hasTag(a, tagKey(style))).length } : undefined
+    // "Sería tu primer disco de X." o, si ya es suyo, "Es tu único disco de X.".
+    const first = (label: string) => (owned ? `Es tu único disco de ${label}.` : `Sería tu primer disco de ${label}.`)
+    // "Ya tienes N de X; este sería el N+1.º" o, si ya es suyo, "Tienes N más de X.".
+    const more = (n: number, label: string) => (owned ? `Tienes ${n} más de ${label}.` : `Ya tienes ${n} de ${label}; este sería el ${ordinal(n + 1)}.`)
     if (g && g.count === 0) {
       const extra = s && s.count === 0 && tagKey(style!) !== tagKey(genre!) ? ` (y de ${s.label})` : ''
-      facts.push({ id: 'genero', icon: '1.º', title: `Sería tu primer disco de ${g.label}${extra}.`, source: 'colección' })
+      facts.push({ id: 'genero', icon: '1.º', title: first(`${g.label}${extra}`), source: 'colección' })
     } else if (s && s.count === 0 && g) {
-      facts.push({ id: 'genero', icon: '1.º', title: `Sería tu primer disco de ${s.label}.`, detail: `Ya tienes ${g.count} de ${g.label}.`, source: 'colección' })
+      facts.push({ id: 'genero', icon: '1.º', title: first(s.label), detail: owned ? `Tienes ${g.count} más de ${g.label}.` : `Ya tienes ${g.count} de ${g.label}.`, source: 'colección' })
     } else if (g) {
-      facts.push({ id: 'genero', icon: '↑', title: `Ya tienes ${g.count} de ${g.label}; este sería el ${ordinal(g.count + 1)}`, detail: s && s.count > 0 && tagKey(style!) !== tagKey(genre!) ? `${s.count === 1 ? 'Uno de ellos es' : `${s.count} de ellos son`} ${s.label}.` : undefined, source: 'colección' })
+      facts.push({ id: 'genero', icon: '↑', title: more(g.count, g.label), detail: s && s.count > 0 && tagKey(style!) !== tagKey(genre!) ? `${s.count === 1 ? 'Uno de ellos es' : `${s.count} de ellos son`} ${s.label}.` : undefined, source: 'colección' })
     } else if (s) {
       facts.push(s.count === 0
-        ? { id: 'genero', icon: '1.º', title: `Sería tu primer disco de ${s.label}.`, source: 'colección' }
-        : { id: 'genero', icon: '↑', title: `Ya tienes ${s.count} de ${s.label}; este sería el ${ordinal(s.count + 1)}`, source: 'colección' })
+        ? { id: 'genero', icon: '1.º', title: first(s.label), source: 'colección' }
+        : { id: 'genero', icon: '↑', title: more(s.count, s.label), source: 'colección' })
     }
   }
 
@@ -132,11 +147,13 @@ export function localFacts(disc: DiscRef, albums: Album[], wishlist: WishlistIte
     const seeds = opts.similarTo.map(artistKey)
     const bySeed = others.filter((a) => seeds.includes(artistKey(a.artist))).sort(byYear)
     if (bySeed.length) {
+      // El verbo concuerda con los artistas, no con los discos (dos discos de Neil Young: "suena").
+      const names = [...new Set(bySeed.map((a) => cleanArtist(a.artist)))]
       facts.push({
         id: 'parecidos',
         icon: '≈',
         title: `Va con ${countWord(bySeed.length)} que ya tienes.`,
-        detail: `${listTitles(bySeed.map((a) => a.title))}: ${listTitles([...new Set(bySeed.map((a) => cleanArtist(a.artist)))])} ${bySeed.length === 1 ? 'suena' : 'suenan'} parecido a ${artist}, según ListenBrainz.`,
+        detail: `${listTitles(bySeed.map((a) => a.title))}: ${listTitles(names)} ${names.length === 1 ? 'suena' : 'suenan'} parecido a ${artist}, según ListenBrainz.`,
         source: 'ListenBrainz',
       })
     }

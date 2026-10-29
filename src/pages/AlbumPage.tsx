@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, deleteAlbum, updateAlbum } from '../db'
+import { addWish, db, deleteAlbum, updateAlbum } from '../db'
 import { personName, useSession } from '../session'
 import { StarRating } from '../components/StarRating'
 import { RateSheet } from '../components/RateSheet'
@@ -12,28 +12,52 @@ import { formatStars } from '../lib/rating'
 import { averageOf, formatAverage } from '../lib/starSlider'
 import { priceLabel, purchaseDateLabel } from '../lib/text'
 import { resolveSpotifyAlbumId, spotifyUrlFor } from '../lib/spotifyLink'
-import { CONDITIONS, type Album, type Condition } from '../types'
+import { CONDITIONS, type Album, type Condition, type WishlistItem } from '../types'
 import '../styles/calificar.css'
+
+/** Lo que manda quien abre la ficha (la vista previa): si acaba de agregar el disco, qué deseo quitó y de dónde venía. */
+interface EntryState {
+  justAdded?: boolean
+  /** El deseo propio que se quitó al agregar, para poder devolverlo con "Deshacer". */
+  removedWish?: WishlistItem
+  /** Rótulo del botón de regreso ("Escanear", "Buscar", "Vista previa"); sin él, "Colección". */
+  from?: string
+}
 
 /** Ficha del disco (pantalla 7): portada, calificación, datos de tu copia, canciones y enlaces. */
 export function AlbumPage() {
   const { id = '' } = useParams()
   const nav = useNavigate()
   const location = useLocation()
-  const album = useLiveQuery(() => db.albums.get(id), [id])
+  // undefined = cargando; null = ya no está (otra persona de la familia pudo quitarlo mientras lo veías).
+  const album = useLiveQuery(async () => (await db.albums.get(id)) ?? null, [id])
   const [editing, setEditing] = useState(false)
   const [rating, setRating] = useState(false)
-  // La vista previa manda `justAdded` al agregar; el aviso se va solo a los 3 s.
-  const [justAdded, setJustAdded] = useState<boolean>(() => Boolean((location.state as { justAdded?: boolean } | null)?.justAdded))
+  const [entry, setEntry] = useState<EntryState>(() => (location.state as EntryState | null) ?? {})
+  const [undoError, setUndoError] = useState<string | null>(null)
+  const justAdded = Boolean(entry.justAdded)
 
   useEffect(() => {
     if (!justAdded) return
-    // Se limpia el estado de la ruta para que el aviso no vuelva al regresar a esta pantalla.
-    nav(location.pathname, { replace: true, state: null })
-    const t = setTimeout(() => setJustAdded(false), 3000)
+    // Se limpia el aviso del estado de la ruta (se conserva de dónde se venía) para que no vuelva al regresar a esta pantalla.
+    nav(location.pathname, { replace: true, state: entry.from ? { from: entry.from } : null })
+    // El aviso se va solo; con "Deshacer" dura más, para alcanzar a tocarlo.
+    const t = setTimeout(() => setEntry((e) => ({ ...e, justAdded: false, removedWish: undefined })), entry.removedWish ? 6000 : 3000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [justAdded])
+
+  /** Devuelve a Deseos el que se quitó al agregar (el mismo disco, con los mismos datos). */
+  async function undoWish() {
+    const w = entry.removedWish
+    if (!w) return
+    setEntry((e) => ({ ...e, justAdded: false, removedWish: undefined }))
+    try {
+      await addWish({ title: w.title, artist: w.artist, year: w.year, coverUrl: w.coverUrl, thumbUrl: w.thumbUrl, discogsId: w.discogsId, discogsMasterId: w.discogsMasterId, musicbrainzReleaseGroupId: w.musicbrainzReleaseGroupId, barcode: w.barcode })
+    } catch (err) {
+      setUndoError(err instanceof Error ? err.message : 'No pude devolverlo a tus deseos.')
+    }
+  }
 
   // Busca una sola vez el ID exacto de Spotify; la ficha se actualiza sola cuando llega.
   useEffect(() => {
@@ -50,10 +74,17 @@ export function AlbumPage() {
   return (
     <main className="page">
       <div className="hero-nav">
-        <button type="button" className="btn btn--sm btn--ghost" onClick={() => nav(-1)}><BackIcon width={20} height={20} /> Colección</button>
+        <button type="button" className="btn btn--sm btn--ghost" onClick={() => nav(-1)}><BackIcon width={20} height={20} /> {entry.from ?? 'Colección'}</button>
         <button type="button" className="btn btn--sm btn--ghost" onClick={() => setEditing(true)}>Editar</button>
       </div>
-      {justAdded && <div className="notice cal-notice" role="status">Listo, ya está en tu colección</div>}
+      {justAdded && (
+        <div className="notice cal-notice" role="status">
+          {entry.removedWish ? (
+            <>Agregado. Lo quité de tus deseos · <button type="button" className="btn btn--sm btn--link" style={{ color: 'inherit', minHeight: 36, padding: '4px 6px' }} onClick={undoWish}>Deshacer</button></>
+          ) : 'Listo, ya está en tu colección'}
+        </div>
+      )}
+      {undoError && <div className="notice notice--error" role="alert">{undoError}</div>}
       <div className="hero">
         <Cover src={album.coverUrl ?? album.thumbUrl} title={album.title} className="hero__img" />
       </div>

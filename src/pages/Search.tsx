@@ -4,6 +4,7 @@ import { lookupText } from '../api/lookup'
 import { CandidateList } from '../components/CandidateList'
 import { SearchIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
+import { albumKey } from '../lib/text'
 import { loadResults, saveResults, saveVista, vistaUrl } from '../lib/vistaState'
 import type { ReleaseCandidate } from '../types'
 
@@ -38,7 +39,9 @@ export function Search() {
   }
 
   function open(c: ReleaseCandidate) {
-    const siblings = results ?? [c]
+    // Como "ediciones" solo van los resultados del mismo álbum; los demás son otros discos.
+    const key = albumKey(c.artist, c.title)
+    const siblings = (results ?? [c]).filter((r) => (c.discogsMasterId && r.discogsMasterId === c.discogsMasterId) || albumKey(r.artist, r.title) === key)
     saveVista({ candidate: c, siblings, from: 'Buscar' })
     nav(vistaUrl(c), { state: { candidate: c, siblings, from: 'Buscar' } })
   }
