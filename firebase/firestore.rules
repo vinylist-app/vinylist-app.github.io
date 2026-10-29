@@ -5,7 +5,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
     function col(cid) { return get(/databases/$(database)/documents/collections/$(cid)); }
-    function isMember(cid) { return signedIn() && col(cid).data.members[uid()] != null; }
+    function isMember(cid) { return signedIn() && uid() in col(cid).data.members; }
     function isOwner(cid) { return signedIn() && col(cid).data.ownerUid == uid(); }
 
     // Perfil propio: nombre, correo y a qué colecciones pertenece.
@@ -17,9 +17,11 @@ service cloud.firestore {
     match /invites/{code} {
       allow get: if signedIn();
       allow list: if false;
+      // getAfter: al crear la colección, el código se guarda en el mismo lote que ella,
+      // así que se revisa quién la administra tal como queda después del lote.
       allow create: if signedIn() && request.resource.data.createdBy == uid()
         && request.resource.data.collectionId is string
-        && isOwner(request.resource.data.collectionId);
+        && getAfter(/databases/$(database)/documents/collections/$(request.resource.data.collectionId)).data.ownerUid == uid();
       allow delete: if signedIn() && isOwner(resource.data.collectionId);
       allow update: if false;
     }
@@ -27,7 +29,7 @@ service cloud.firestore {
     match /collections/{cid} {
       allow get: if isMember(cid);
       // Para el selector de colecciones: solo las propias, nunca un listado general.
-      allow list: if signedIn() && resource.data.members[uid()] != null;
+      allow list: if signedIn() && uid() in resource.data.members;
       allow create: if signedIn()
         && request.resource.data.ownerUid == uid()
         && request.resource.data.members[uid()].role == 'owner'
@@ -37,11 +39,11 @@ service cloud.firestore {
         // Quien administra cambia lo que quiera (nombre, token de Discogs, código, miembros).
         resource.data.ownerUid == uid() && request.resource.data.ownerUid == resource.data.ownerUid
         // Un miembro cambia solo su propio nombre o se sale.
-        || (resource.data.members[uid()] != null
+        || (uid() in resource.data.members
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
             && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([uid()]))
         // Alguien se une con un código válido de esta colección y solo se agrega a sí mismo.
-        || (resource.data.members[uid()] == null
+        || (!(uid() in resource.data.members)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'joinCode'])
             && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([uid()])
             && request.resource.data.members[uid()].role == 'editor'

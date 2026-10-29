@@ -5,3 +5,7 @@ dev-dist
 .env.local
 *.local
 .DS_Store
+# Bitácoras del emulador de Firebase (npm run test:nube)
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
