@@ -1,6 +1,6 @@
 # Versiones de VinyList
 
-## v0.1 · Primera versión (esta)
+## v0.1 · Primera versión
 - [x] Escanear código de barras con la cámara, o escribirlo a mano.
 - [x] Buscar por artista, título o número de catálogo (discos sin código).
 - [x] Datos y portada de Discogs, con MusicBrainz y Cover Art Archive de respaldo.
@@ -15,12 +15,15 @@
 - [x] "Escuchar en Spotify" en la ficha, en deseos y en resultados: abre la app de Spotify, sin cuenta ni clave; el enlace es exacto cuando MusicBrainz conoce el álbum y, si no, una búsqueda.
 - [x] "Para ti": sugerencias según calificaciones y compras, con la razón de cada una (más discos de tus favoritos, artistas parecidos vía ListenBrainz). Se calcula en el celular, sin cuenta, y se guarda 30 días.
 
-## v0.2 · La nube familiar
-- [ ] Inicio de sesión (correo con enlace mágico) y grupo familiar con invitación.
-- [ ] Sincronización con Supabase: una colección compartida, varios celulares.
-- [ ] Calificación de cada familiar y promedio familiar.
-- [ ] Lista de deseos compartida; el apartado para regalo se oculta a quien lo quiere.
-- [ ] Función en Supabase para llamar a Discogs sin exponer el token.
+## v0.2 · Tu cuenta y la nube familiar (en construcción)
+- [x] Cuenta por persona (correo y contraseña); cada quien tiene su propia colección.
+- [x] Familia: invitación por código o enlace; varios celulares, una colección (Firebase: Auth + Firestore con caché local, cambios sin internet que suben solos).
+- [x] Calificación de cada familiar guardada por separado; al cambiar de cuenta ves la tuya.
+- [x] Lista de deseos compartida; el apartado para regalo se oculta a quien lo quiere.
+- [x] Token de Discogs guardado en la colección de la familia, nunca en el código.
+- [ ] Vista previa al escanear o buscar: primero el disco con su contexto ("te cuenta"), luego "Agregar a mi colección".
+- [ ] Calificar deslizando el dedo sobre las estrellas; opcional al agregar.
+- [ ] Modo claro y oscuro con interruptor en Ajustes.
 - [ ] Importar colección desde Discogs y CLZ (CSV).
 
 ## v0.3 · El chat

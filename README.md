@@ -30,6 +30,19 @@ Abre la dirección que imprime (normalmente http://localhost:5173). Para probar 
 
 Sin token de Discogs la app sigue funcionando con MusicBrainz, pero sin géneros ni lista de canciones, y "Para ti" tarda más la primera vez (MusicBrainz acepta una consulta por segundo; después queda guardado 30 días).
 
+## La nube familiar
+
+Sin configurar nada, la app guarda todo en el celular. Para que varias personas compartan una colección hace falta un proyecto gratuito de Firebase (plan Spark, sin tarjeta):
+
+1. En https://console.firebase.google.com crea un proyecto.
+2. Authentication → Sign-in method → activa "Correo electrónico/contraseña".
+3. Firestore Database → crea la base y pega el contenido de `firebase/firestore.rules` en la pestaña Reglas.
+4. Configuración del proyecto → "Tus apps" → agrega una app web y copia el objeto `firebaseConfig` en `src/cloud/firebase-config.json` (son valores públicos; las reglas son lo que protege los datos).
+
+Cada persona crea su cuenta en la app y tiene su propia colección. Para compartirla, en Familia se genera un código de invitación. Los cambios se guardan primero en el celular y suben solos cuando hay internet. El token de Discogs se guarda en la colección de la familia, nunca en el código.
+
+Para probar la nube sin cuenta hay un emulador local (`firebase/firebase.json`, proyecto `demo-vinylist`): con el emulador corriendo, `VITE_FIREBASE_EMULATOR=1 npm run dev` conecta la app a él.
+
 ## Publicarla gratis
 
 **GitHub Pages** (ya viene configurado): en el repositorio, Settings → Pages → Source: "GitHub Actions". Cada vez que `main` cambia, el flujo `.github/workflows/pages.yml` compila la app y la publica en `https://<usuario>.github.io/vinylist/`. Al abrir ese enlace en el celular, "Agregar a pantalla de inicio" instala la app.
@@ -59,11 +72,14 @@ src/
   components/ Estrellas, tarjetas, barra inferior, íconos
   lib/        Filtros, calificaciones, perfil, enlaces a Spotify
   lib/taste/  Perfil de gustos, candidatos y ranking de "Para ti"
-  pages/      Colección, Buscar, Escanear, Álbum, Para ti, Deseos, Ajustes
-  db.ts       Base local (IndexedDB)
+  pages/      Colección, Buscar, Escanear, Vista previa, Álbum, Para ti, Deseos, Ajustes, Cuenta, Familia
+  cloud/      Cuenta, colección compartida y sincronización con la nube (Firebase)
+  db.ts       Base local (IndexedDB), espejo de la colección activa
+  session.ts  Sesión: quién eres y qué colección estás viendo
   types.ts    Tipos de datos
-supabase/
-  schema.sql  Esquema de la nube familiar (v0.2)
+firebase/
+  firestore.rules  Reglas de acceso de la nube familiar
+  firebase.json    Emulador local para probar la nube sin cuenta
 ```
 
 ## Fuentes de datos y licencias
