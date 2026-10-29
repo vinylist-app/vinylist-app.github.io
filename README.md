@@ -7,11 +7,12 @@ Es una **PWA**: se abre desde un enlace, se instala en la pantalla de inicio de 
 ## Qué hace (v0.1)
 
 - Escanea el código de barras o busca a mano; elige tu edición exacta.
+- **Vista previa** antes de agregar: la app compara el disco con tu colección y te cuenta si sería tu primero del artista o del género, con cuáles de los tuyos va, qué te faltaría de su discografía, si es icónico y un dato de su historia (fuentes: tu colección, MusicBrainz, Wikipedia, Discogs, ListenBrainz). Luego decides: agregarlo, ponerlo en Deseos o solo escucharlo.
 - Portada, canciones y datos de Discogs (respaldo: MusicBrainz).
 - Calificación de 5 estrellas **con medias estrellas**.
 - Filtros por género, década y calificación; orden por artista, título o año.
 - Estado del disco y la funda, ubicación, datos de compra, notas.
-- Aviso de "ya lo tienen" al escanear.
+- Aviso de "ya lo tienen" en la vista previa, con enlace a tu copia.
 - Lista de deseos. Respaldo en archivo.
 - **Para ti**: sugerencias según tus calificaciones y compras, con la razón de cada una.
 - **Escuchar en Spotify** desde la ficha, los deseos y las sugerencias (abre la app de Spotify; no pide cuenta).
@@ -68,10 +69,11 @@ Configura las variables de `.env.example` en el panel del hospedaje.
 
 ```
 src/
-  api/        Discogs, MusicBrainz, ListenBrainz y la búsqueda con respaldo
+  api/        Discogs, MusicBrainz, ListenBrainz, Wikipedia y la búsqueda con respaldo
   components/ Estrellas, tarjetas, barra inferior, íconos
   lib/        Filtros, calificaciones, perfil, enlaces a Spotify
   lib/taste/  Perfil de gustos, candidatos y ranking de "Para ti"
+  lib/context/ Motor de "Te cuenta": lo que la colección y las fuentes dicen de un disco
   pages/      Colección, Buscar, Escanear, Vista previa, Álbum, Para ti, Deseos, Ajustes, Cuenta, Familia
   cloud/      Cuenta, colección compartida y sincronización con la nube (Firebase)
   db.ts       Base local (IndexedDB), espejo de la colección activa
@@ -86,5 +88,6 @@ firebase/
 
 - Discogs API: uso personal; parte de los datos está bajo sus términos de la API.
 - MusicBrainz y Cover Art Archive: datos abiertos.
-- ListenBrainz Labs (artistas parecidos): datos abiertos (CC0), sin clave.
+- ListenBrainz y ListenBrainz Labs (artistas parecidos, discos más escuchados): datos abiertos (CC0), sin clave.
+- Wikipedia y Wikidata: resúmenes bajo CC BY-SA, con enlace al artículo y su idioma.
 - Spotify: solo enlaces a su app (`open.spotify.com`); no se usa su API ni se guarda nada de tu cuenta.
