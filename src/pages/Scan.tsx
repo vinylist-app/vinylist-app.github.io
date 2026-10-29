@@ -1,24 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useNavigationType } from 'react-router-dom'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { lookupBarcode } from '../api/lookup'
-import { addCandidate, duplicateOf } from '../lib/addFromCandidate'
 import { CandidateList } from '../components/CandidateList'
-import { CloseIcon, KeyboardIcon } from '../components/Icons'
-import type { Album, ReleaseCandidate } from '../types'
+import { BackIcon, CloseIcon, KeyboardIcon } from '../components/Icons'
+import { loadResults, saveResults, saveVista, vistaUrl } from '../lib/vistaState'
+import type { ReleaseCandidate } from '../types'
 
 type Phase = 'scanning' | 'looking' | 'results' | 'manual'
 
+/**
+ * Escanear ya no agrega el disco: cada edición abre la vista previa, donde la
+ * app cuenta qué sabe del disco y la persona decide. Si el código da una sola
+ * edición, se abre directo; si da varias, se elige la que se tiene en la mano.
+ */
 export function Scan() {
   const nav = useNavigate()
+  const navType = useNavigationType()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [phase, setPhase] = useState<Phase>('scanning')
-  const [code, setCode] = useState('')
-  const [results, setResults] = useState<ReleaseCandidate[]>([])
+  // Al volver desde la vista previa ("‹ Escanear"), se recuperan las ediciones en vez de abrir la cámara.
+  const [restored] = useState(() => (navType === 'POP' ? loadResults('escaneo') : undefined))
+  const [phase, setPhase] = useState<Phase>(restored && restored.results.length > 1 ? 'results' : 'scanning')
+  const [code, setCode] = useState(restored?.query ?? '')
+  const [results, setResults] = useState<ReleaseCandidate[]>(restored?.results ?? [])
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | undefined>()
-  const [dup, setDup] = useState<Album | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -43,6 +49,11 @@ export function Scan() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
 
+  function open(c: ReleaseCandidate, siblings: ReleaseCandidate[]) {
+    saveVista({ candidate: c, siblings, from: 'Escanear' })
+    nav(vistaUrl(c), { state: { candidate: c, siblings, from: 'Escanear' } })
+  }
+
   async function lookup(raw: string) {
     const clean = raw.replace(/\D/g, '')
     setCode(clean)
@@ -51,27 +62,16 @@ export function Scan() {
     try {
       const found = await lookupBarcode(clean)
       setResults(found)
-      // Aviso de duplicado: si cualquiera de las ediciones ya está en la colección.
-      for (const c of found) {
-        const d = await duplicateOf(c)
-        if (d) { setDup(d.album); break }
+      saveResults('escaneo', { query: clean, results: found })
+      if (found.length === 1) {
+        // Una sola edición: directo a la vista previa, sin lista.
+        open(found[0], found)
+        return
       }
       setPhase('results')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo buscar el código.')
       setPhase('results')
-    }
-  }
-
-  async function pick(c: ReleaseCandidate) {
-    setBusy(c.sourceId)
-    try {
-      const album = await addCandidate(c)
-      nav(`/album/${album.id}`, { replace: true })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo agregar.')
-    } finally {
-      setBusy(undefined)
     }
   }
 
@@ -83,7 +83,7 @@ export function Scan() {
           <div className="scanner__frame"><div className="scanner__box"><i className="scanner__corner" /><i className="scanner__corner" /><i className="scanner__line" /></div></div>
           <div className="scanner__top">
             <Link to="/" className="icon-btn" aria-label="Cerrar escáner"><CloseIcon /></Link>
-            <span>Agregar disco</span>
+            <span>Escanear</span>
             <button className="icon-btn" aria-label="Escribir el código a mano" onClick={() => setPhase('manual')}><KeyboardIcon /></button>
           </div>
         </div>
@@ -113,26 +113,33 @@ export function Scan() {
         </form>
       )}
 
-      {phase === 'looking' && <div className="empty" style={{ paddingTop: 'calc(80px + var(--safe-top))' }}><p>Buscando el código {code}…</p></div>}
+      {phase === 'looking' && <div className="empty" style={{ paddingTop: 'calc(80px + var(--safe-top))' }} role="status" aria-live="polite"><p>Buscando el código {code}…</p></div>}
 
       {phase === 'results' && (
-        <div className="stack" style={{ paddingTop: 'calc(24px + var(--safe-top))', gap: 14 }}>
-          {dup && <Link to={`/album/${dup.id}`} className="notice">Ya tienen una edición de este disco: {dup.title}. Toca para verla.</Link>}
+        <div className="stack" style={{ paddingTop: 'calc(12px + var(--safe-top))', gap: 14 }}>
+          <div className="hero-nav">
+            <button type="button" className="btn btn--sm btn--ghost" onClick={() => { setResults([]); setPhase('scanning') }}><BackIcon width={20} height={20} /> Escanear</button>
+            <Link to="/buscar" className="btn btn--sm btn--ghost">Buscar a mano</Link>
+          </div>
           {error && <div className="notice notice--error">{error}</div>}
           <div className="stack" style={{ gap: 2 }}>
-            <span className="muted">Código {code} · {results.length} {results.length === 1 ? 'edición encontrada' : 'ediciones encontradas'}</span>
-            {results[0] && <h2>{results[0].title} · {results[0].artist}</h2>}
-            <span className="muted">Elige la edición que tienes en la mano</span>
+            <span className="eyebrow">Código {code} · {results.length} {results.length === 1 ? 'edición' : 'ediciones'} en vinilo</span>
+            {results[0] && <h2>{results[0].title}</h2>}
+            {results[0] && <span className="muted">{results[0].artist}{results[0].year ? ` · ${results[0].year}` : ''}</span>}
           </div>
           {results.length > 0 ? (
-            <CandidateList candidates={results} onPick={pick} busyId={busy} />
+            <>
+              <span className="muted">Elige la edición que tienes en la mano</span>
+              <CandidateList candidates={results} onPick={(c) => open(c, results)} />
+              <div className="notice" style={{ background: 'transparent', border: '1px dashed var(--line)', color: 'var(--text-2)', fontWeight: 500 }}>¿Tu copia es otra edición? Elígela aquí. Si el disco ya está en la colección, te avisamos antes de repetirlo.</div>
+            </>
           ) : (
             <div className="empty">
               <p>No hay ediciones con ese código. Los discos antiguos a veces no están por código.</p>
               <Link to="/buscar" className="btn btn--primary">Buscar por artista y título</Link>
             </div>
           )}
-          <button className="btn" onClick={() => { setResults([]); setDup(null); setPhase('scanning') }}>Escanear otro</button>
+          <button className="btn" onClick={() => { setResults([]); setPhase('scanning') }}>Escanear otro</button>
         </div>
       )}
     </main>
