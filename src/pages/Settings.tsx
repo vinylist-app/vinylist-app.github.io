@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { addAlbum, addWish, db, exportCollection } from '../db'
+import { db, exportCollection } from '../db'
+import { cloudWrites } from '../cloud/bridge'
+import { adoptWish, normalizeLocalWish } from '../data/pure'
 import { useAlbums, useWishlist } from '../data/hooks'
 import { activeCollectionId, setSession, useSession } from '../session'
 import { setProfileName } from '../lib/profile'
@@ -116,25 +118,30 @@ export function Settings() {
       const cid = activeCollectionId()
       let added = 0
       if (!cloud) {
-        // Solo este celular: se restaura tal cual, conservando ids.
+        // Solo este celular: se restaura tal cual, conservando ids; los deseos que eran míos en el respaldo siguen siéndolo.
         await db.albums.bulkPut(data.albums.map((a) => ({ ...a, collectionId: cid })))
-        if (wishes.length) await db.wishlist.bulkPut(wishes.map((w) => ({ ...w, collectionId: cid })))
+        if (wishes.length) await db.wishlist.bulkPut(wishes.map((w) => normalizeLocalWish({ ...w, collectionId: cid })))
         added = data.albums.length
       } else {
-        // Con nube: cada disco entra por el camino normal (así también sube), sin repetir los que ya están.
+        // Con nube: cada disco se guarda aquí y sube, conservando el id del respaldo
+        // para que restaurar el mismo archivo dos veces no repita nada.
         setBusy(true)
+        const now = new Date().toISOString()
+        const nube = cloudWrites()
         const have = new Set((await db.albums.where('collectionId').equals(cid).primaryKeys()) as string[])
         for (const a of data.albums) {
-          if (have.has(a.id)) continue
-          const rest: Partial<Album> = { ...a }
-          delete rest.id; delete rest.addedAt; delete rest.updatedAt; delete rest.collectionId
-          await addAlbum(rest as Omit<Album, 'id' | 'addedAt' | 'updatedAt' | 'collectionId'>)
+          if (!a.id || have.has(a.id)) continue
+          const full: Album = { ...a, collectionId: cid, addedBy: a.addedBy ?? person.uid, addedAt: a.addedAt ?? now, updatedAt: now }
+          await db.albums.put(full)
+          await nube?.putAlbum(full)
           added++
         }
         const haveWishes = new Set((await db.wishlist.where('collectionId').equals(cid).primaryKeys()) as string[])
         for (const w of wishes) {
-          if (haveWishes.has(w.id)) continue
-          await addWish({ title: w.title, artist: w.artist, year: w.year, coverUrl: w.coverUrl, thumbUrl: w.thumbUrl, discogsId: w.discogsId, discogsMasterId: w.discogsMasterId, musicbrainzReleaseGroupId: w.musicbrainzReleaseGroupId, barcode: w.barcode })
+          if (!w.id || haveWishes.has(w.id)) continue
+          const full = adoptWish(w, person, cid)
+          await db.wishlist.put(full)
+          await nube?.putWish(full)
         }
       }
       setMsg({ text: added === 0 ? 'Todo lo del respaldo ya estaba en la colección.' : `Se restauraron ${added} ${added === 1 ? 'disco' : 'discos'}.` })

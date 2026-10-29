@@ -5,12 +5,15 @@ import { VitePWA } from 'vite-plugin-pwa'
 import pkg from './package.json' with { type: 'json' }
 
 // En GitHub Pages la app vive bajo /vinylist/ (VITE_BASE); en otros hospedajes, en la raíz.
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const base = loadEnv(mode, '.', 'VITE_').VITE_BASE || '/'
   return {
   base,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // El token de Discogs de .env es solo para `npm run dev`: en el build se vacía para
+    // que nunca quede escrito en el JS público, aunque .env o el hospedaje lo tengan.
+    ...(command === 'build' ? { 'import.meta.env.VITE_DISCOGS_TOKEN': 'undefined' } : {}),
   },
   plugins: [
     react(),

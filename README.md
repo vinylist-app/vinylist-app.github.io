@@ -54,7 +54,7 @@ También sirve cualquier hospedaje de sitios estáticos (Vercel, Netlify, Cloudf
 npm run build   # genera la carpeta dist/ (con VITE_BASE=/ruta/ si no va en la raíz)
 ```
 
-Configura las variables de `.env.example` en el panel del hospedaje.
+En el panel del hospedaje solo hace falta `VITE_BASE` si la app no va en la raíz. No pongas `VITE_DISCOGS_TOKEN` ahí ni compiles con un `.env` que lo tenga: es solo para `npm run dev`; el build lo descarta para que el token no quede en el JS público (en la app se guarda en la colección de la familia o en el celular).
 
 ## Comandos
 

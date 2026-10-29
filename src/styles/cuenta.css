@@ -79,7 +79,8 @@ button.cu-person:active { background: var(--card-2); }
 /* Ajustes: filas que se tocan */
 .cu-srow { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; text-align: left; min-height: 48px; color: var(--text); }
 .cu-srow:last-child { border-bottom: 0; }
-.cu-srow > span:last-child { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.cu-srow > span:last-child { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; min-width: 0; overflow-wrap: anywhere; }
+.cu-srow > span:last-child > .cu-chev { flex: none; }
 .cu-srow:active { background: var(--card-2); }
 .cu-srow .cu-chev { color: var(--text-2); }
 .cu-name-edit { display: flex; align-items: center; gap: 6px; }

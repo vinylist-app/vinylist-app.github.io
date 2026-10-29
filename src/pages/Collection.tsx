@@ -15,7 +15,10 @@ const SORTS: { value: Filters['sort']; label: string }[] = [
 ]
 
 export function Collection() {
-  const albums = useAlbums() ?? []
+  const loaded = useAlbums()
+  // undefined mientras la base responde o la sesión arranca: se muestra "Cargando…", no el vacío de bienvenida.
+  const cargando = loaded === undefined
+  const albums = loaded ?? []
   const [f, setF] = useState<Filters>(DEFAULT_FILTERS)
   const genres = useMemo(() => collectGenres(albums).slice(0, 12), [albums])
   const decades = useMemo(() => collectDecades(albums), [albums])
@@ -37,7 +40,7 @@ export function Collection() {
           <Logo />
           <div className="title-row">
             <h1>Colección</h1>
-            <span className="badge">{filtrado ? `${shown.length} de ${albums.length}` : `${albums.length} ${albums.length === 1 ? 'disco' : 'discos'}`}</span>
+            {!cargando && <span className="badge">{filtrado ? `${shown.length} de ${albums.length}` : `${albums.length} ${albums.length === 1 ? 'disco' : 'discos'}`}</span>}
           </div>
         </div>
         <Link to="/ajustes" className="icon-btn icon-btn--ghost" aria-label="Ajustes"><SettingsIcon /></Link>
@@ -68,7 +71,9 @@ export function Collection() {
         </>
       )}
 
-      {albums.length === 0 ? (
+      {cargando ? (
+        <p className="muted" style={{ textAlign: 'center' }}>Cargando…</p>
+      ) : albums.length === 0 ? (
         <div className="empty">
           <div className="empty__tiles" aria-hidden="true"><i /><i /><i /><i /></div>
           <h2>Tu colección empieza aquí</h2>
