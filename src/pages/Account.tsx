@@ -36,7 +36,9 @@ export function Account() {
 
   // Ya dentro, sin colección
   const [step, setStep] = useState<Step>('choose')
-  const [collectionName, setCollectionName] = useState('')
+  // null = la persona no lo ha editado; se muestra el sugerido con su nombre (que puede llegar un instante después de crear la cuenta).
+  const [editedName, setEditedName] = useState<string | null>(null)
+  const collectionName = editedName ?? (person.name ? `Familia de ${person.name}` : '')
   const [pasted, setPasted] = useState('')
   const [offer, setOffer] = useState<UploadOffer | null>(null)
   const autoJoined = useRef(false)
@@ -79,9 +81,6 @@ export function Account() {
     // Solo al entrar; memberships puede llegar después y no debe repetir la unión.
   }, [signedIn])
 
-  useEffect(() => {
-    if (signedIn && !collectionName) setCollectionName(`Familia de ${person.name}`)
-  }, [signedIn, person.name, collectionName])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -253,7 +252,7 @@ export function Account() {
             <form className="card cu-form" onSubmit={create}>
               <label className="field">
                 <span>Nombre de la colección</span>
-                <input className="input" value={collectionName} onChange={(e) => setCollectionName(e.target.value)} autoFocus required />
+                <input className="input" value={collectionName} onChange={(e) => setEditedName(e.target.value)} autoFocus required />
               </label>
               <span className="cu-hint">Lo ven todos los que invites. Lo puedes cambiar después.</span>
               <button className="btn btn--primary" type="submit" disabled={busy}>{busy ? 'Creando…' : 'Crear mi colección'}</button>

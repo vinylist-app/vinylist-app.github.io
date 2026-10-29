@@ -47,7 +47,7 @@ export function AboutAlbum({ album, candidate }: { album?: Album; candidate?: Re
   const { person } = useSession()
   const subject = album ?? candidate
   const disc = useMemo(() => (subject ? discRefOf(subject) : undefined), [subject])
-  const data = useTeCuenta(disc, albums, wishlist, { me: person.uid, alreadyOwned: Boolean(album), withVerdict: !album })
+  const data = useTeCuenta(disc, albums, wishlist, { me: person.uid, alreadyOwned: Boolean(album), withVerdict: !album, withLocal: !album })
   if (!disc) return null
   return <TeCuentaCard data={data} />
 }

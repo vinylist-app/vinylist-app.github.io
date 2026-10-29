@@ -29,6 +29,8 @@ interface Options {
   alreadyOwned?: boolean
   /** Sin veredicto (en la ficha de un disco que ya es tuyo no tiene sentido). */
   withVerdict?: boolean
+  /** Sin las líneas de "en tu colección" (en la ficha ya lo tienes; hablarían de un disco que falta). */
+  withLocal?: boolean
 }
 
 function online(): boolean {
@@ -81,11 +83,11 @@ export function useTeCuenta(disc: DiscRef | undefined, albums: Album[] | undefin
 
   return useMemo<TeCuentaData>(() => {
     if (!disc || !albums) return { facts: [], status: 'idle', sources: [] }
-    const local = localFacts(disc, albums, wishlist ?? [], profile, { me: opts.me, similarTo })
+    const local = opts.withLocal === false ? [] : localFacts(disc, albums, wishlist ?? [], profile, { me: opts.me, similarTo })
     const facts = mergeFacts(local, remote)
     const verdict = opts.withVerdict === false ? undefined : verdictFor(disc, profile)
     return { facts, verdict, status, sources: sourcesOf(facts) }
-  }, [disc, albums, wishlist, profile, similarTo, remote, status, opts.me, opts.withVerdict])
+  }, [disc, albums, wishlist, profile, similarTo, remote, status, opts.me, opts.withVerdict, opts.withLocal])
 }
 
 export function TeCuentaCard({ data }: { data: TeCuentaData }) {

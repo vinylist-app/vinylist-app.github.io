@@ -15,6 +15,14 @@ import '../styles/cuenta.css'
  */
 const INVALID = 'Ese enlace ya no sirve. Pide uno nuevo a tu familia.'
 
+/** Los errores de permisos o de red de la nube no se muestran crudos. */
+function friendly(e: unknown): string {
+  if (!(e instanceof Error)) return INVALID
+  const code = (e as { code?: string }).code ?? ''
+  if (code.includes('permission') || code.includes('unavailable') || /false for|Missing or insufficient/i.test(e.message)) return code.includes('unavailable') ? 'Sin conexión. Intenta cuando tengas internet.' : INVALID
+  return e.message || INVALID
+}
+
 export function Join() {
   const nav = useNavigate()
   const { code: raw } = useParams()
@@ -26,7 +34,7 @@ export function Join() {
   const [offer, setOffer] = useState<{ cid: string; albums: number; wishes: number } | null>(null)
 
   useEffect(() => {
-    if (!cloudAvailable || status === 'starting') return
+    if (!cloudAvailable || status !== 'signed-in') return
     if (!code) {
       setError(INVALID)
       return
@@ -34,7 +42,7 @@ export function Join() {
     let alive = true
     previewInvite(code)
       .then((p) => { if (alive) setPreview(p) })
-      .catch((e: unknown) => { if (alive) setError(e instanceof Error ? e.message : INVALID) })
+      .catch((e: unknown) => { if (alive) setError(friendly(e)) })
     return () => { alive = false }
   }, [code, cloudAvailable, status])
 
@@ -55,7 +63,7 @@ export function Join() {
       if (counts.albums + counts.wishes > 0) setOffer({ cid, ...counts })
       else nav('/', { replace: true })
     } catch (e) {
-      setError(e instanceof Error ? e.message : INVALID)
+      setError(friendly(e))
     } finally {
       setBusy(false)
     }
@@ -97,7 +105,23 @@ export function Join() {
         </section>
       )}
 
-      {cloudAvailable && status !== 'starting' && !error && !preview && <p className="muted" style={{ textAlign: 'center' }}>Buscando la invitación…</p>}
+      {cloudAvailable && status === 'signed-out' && code && (
+        <section className="stack" style={{ alignItems: 'center', textAlign: 'center', gap: 14 }}>
+          <span className="cu-option__icon" style={{ color: 'var(--accent)' }}><LinkIcon width={32} height={32} /></span>
+          <h2>Te invitaron a una colección</h2>
+          <p className="muted" style={{ margin: 0, maxWidth: 320 }}>Primero entra con tu cuenta (o créala, es rápido). Al terminar, te unimos solo.</p>
+          <button className="btn btn--primary" style={{ width: '100%' }} onClick={goSignIn}>Entrar o crear mi cuenta</button>
+        </section>
+      )}
+      {cloudAvailable && status === 'signed-out' && !code && !error && (
+        <section className="stack" style={{ alignItems: 'center', textAlign: 'center', gap: 12 }}>
+          <h2>Este enlace no abre</h2>
+          <div className="notice notice--error" role="alert">{INVALID}</div>
+          <button className="btn" onClick={() => nav('/')}>Ir a mi colección</button>
+        </section>
+      )}
+
+      {cloudAvailable && status === 'signed-in' && !error && !preview && <p className="muted" style={{ textAlign: 'center' }}>Buscando la invitación…</p>}
 
       {preview && offer && (
         <UploadLocalOffer cid={offer.cid} albums={offer.albums} wishes={offer.wishes} onDone={() => nav('/', { replace: true })} />
@@ -107,12 +131,6 @@ export function Join() {
         <section className="stack" style={{ alignItems: 'center', textAlign: 'center', gap: 14 }}>
           <span className="cu-option__icon" style={{ color: 'var(--accent)' }}><LinkIcon width={32} height={32} /></span>
           <h2>Te invitaron a la colección «{preview.collectionName}»</h2>
-          {status === 'signed-out' && (
-            <>
-              <p className="muted" style={{ margin: 0, maxWidth: 320 }}>Primero entra con tu cuenta (o créala, es rápido). Al terminar, te unimos solo.</p>
-              <button className="btn btn--primary" style={{ width: '100%' }} onClick={goSignIn}>Entrar o crear mi cuenta</button>
-            </>
-          )}
           {status === 'signed-in' && alreadyIn && (
             <>
               <p className="muted" style={{ margin: 0 }}>Ya estás en esta colección.</p>

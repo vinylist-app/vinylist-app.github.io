@@ -43,7 +43,7 @@ export function startCloud(): void {
       return
     }
     const uid = user.uid
-    setSession({ status: 'signed-in', person: { uid, name: user.displayName || user.email?.split('@')[0] || 'Yo', email: user.email ?? undefined } })
+    setSession({ status: 'signed-in', person: { uid, name: user.displayName || capitalize(user.email?.split('@')[0]) || 'Yo', email: user.email ?? undefined } })
     const fs = getDb()
     let currentCid: string | undefined
     stopUser = onSnapshot(doc(fs, 'users', uid), (snap) => {
@@ -87,4 +87,9 @@ export function startCloud(): void {
       }, (err) => setSession({ sync: { state: 'error', message: err.message } }))
     }, (err) => setSession({ sync: { state: 'error', message: err.message } }))
   })
+}
+
+/** 'santiago' → 'Santiago', para cuando el perfil todavía no trae nombre. */
+function capitalize(s: string | undefined): string | undefined {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }
