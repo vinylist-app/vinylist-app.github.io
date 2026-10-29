@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
-import App from './App'
 import { applyTheme, watchSystemTheme } from './lib/theme'
 import { cloudConfigured } from './cloud/config'
 import { setSession } from './session'
 import './styles.css'
+import App from './App'
 
 registerSW({ immediate: true })
 applyTheme()

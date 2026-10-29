@@ -18,6 +18,7 @@ import { BackIcon, DiscIcon, HeartIcon, SpotifyIcon } from '../components/Icons'
 import { HeartFilledIcon, PlusIcon } from '../components/VistaIcons'
 import { TeCuentaCard, useTeCuenta } from '../components/TeCuenta'
 import { discRefOf } from '../components/AboutAlbum'
+import { Sheet } from '../components/Sheet'
 import '../styles/vista.css'
 
 type DetailsState = 'idle' | 'loading' | 'done' | 'error'
@@ -257,14 +258,11 @@ export function Preview() {
       </div>
 
       {sheet && (
-        <div className="sheet" onClick={() => setSheet(false)}>
-          <div className="sheet__panel" role="dialog" aria-modal="true" aria-labelledby="vista-sheet-h" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet__handle" />
-            <h2 id="vista-sheet-h">¿Cuál edición tienes en la mano?</h2>
-            <CandidateList candidates={siblings} onPick={changeEdition} pickLabel="Es esta" currentId={c.sourceId} />
-            <button type="button" className="btn" onClick={() => setSheet(false)}>Cancelar</button>
-          </div>
-        </div>
+        <Sheet onClose={() => setSheet(false)} labelledBy="vista-sheet-h">
+          <h2 id="vista-sheet-h">¿Cuál edición tienes en la mano?</h2>
+          <CandidateList candidates={siblings} onPick={changeEdition} pickLabel="Es esta" currentId={c.sourceId} />
+          <button type="button" className="btn" onClick={() => setSheet(false)}>Cancelar</button>
+        </Sheet>
       )}
     </main>
   )

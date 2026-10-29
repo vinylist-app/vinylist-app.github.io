@@ -5,6 +5,7 @@ import { addWish, db, deleteAlbum, updateAlbum } from '../db'
 import { personName, useSession } from '../session'
 import { StarRating } from '../components/StarRating'
 import { RateSheet } from '../components/RateSheet'
+import { Sheet } from '../components/Sheet'
 import { AboutAlbum } from '../components/AboutAlbum'
 import { Cover } from '../components/AlbumCard'
 import { BackIcon, DiscIcon, SpotifyIcon, StarPath } from '../components/Icons'
@@ -245,10 +246,9 @@ function EditSheet({ album, onClose }: { album: Album; onClose: () => void }) {
     </label>
   )
   return (
-    <div className="sheet" onClick={onClose}>
-      <form className="sheet__panel" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); save() }}>
-        <div className="sheet__handle" />
-        <h2>Datos de tu copia</h2>
+    <Sheet onClose={onClose} labelledBy="edit-sheet-h">
+      <form className="stack" style={{ gap: 14 }} onSubmit={(e) => { e.preventDefault(); save() }}>
+        <h2 id="edit-sheet-h">Datos de tu copia</h2>
         <div className="facts">
           {condSelect('mediaCondition', 'Estado del disco')}
           {condSelect('sleeveCondition', 'Estado de la funda')}
@@ -265,6 +265,6 @@ function EditSheet({ album, onClose }: { album: Album; onClose: () => void }) {
           <button type="submit" className="btn btn--primary grow">Guardar</button>
         </div>
       </form>
-    </div>
+    </Sheet>
   )
 }
