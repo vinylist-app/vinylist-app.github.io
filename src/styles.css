@@ -235,8 +235,11 @@ h3 { font-size: 18px; }
 .actionbar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 20px calc(16px + var(--safe-bottom)); background: var(--bg-2); border-top: 1px solid var(--line); display: flex; gap: 10px; z-index: 10; }
 .actionbar .btn { flex: 1; }
 
-.sheet { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: flex-end; z-index: 20; }
-.sheet__panel { width: 100%; max-width: 720px; margin: 0 auto; background: var(--bg-2); border-radius: 20px 20px 0 0; padding: 12px 20px calc(24px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 14px; max-height: 85dvh; overflow-y: auto; }
+/* Hoja modal (components/Sheet.tsx). El velo no deja pasar ningún gesto a la página de fondo;
+   el panel se desplaza solo él (pan-y) y, al llegar a su límite, no encadena el scroll al documento. */
+.sheet { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: flex-end; z-index: 20; touch-action: none; }
+.sheet__panel { width: 100%; max-width: 720px; margin: 0 auto; background: var(--bg-2); border-radius: 20px 20px 0 0; padding: 12px 20px calc(24px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 14px; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.sheet__panel:focus { outline: none; }
 .sheet__handle { width: 40px; height: 5px; border-radius: 3px; background: var(--text-2); opacity: 0.45; align-self: center; }
 .progress { appearance: none; -webkit-appearance: none; width: 100%; height: 6px; border: 0; border-radius: 3px; background: var(--card-2); overflow: hidden; }
 .progress::-webkit-progress-bar { background: var(--card-2); }

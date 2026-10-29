@@ -55,6 +55,23 @@ export function starUnder(v: number): number {
   return clamp(Math.ceil(v), 1, 5)
 }
 
+/**
+ * Cuántas estrellas se pintan: el valor continuo mientras el dedo está encima
+ * (`live`), o la calificación guardada si no. Por debajo de un cuarto de estrella
+ * `snap` da "sin calificar", así que las cinco se ven vacías: la persona ve que va
+ * a borrar antes de soltar.
+ */
+export function shownStarsFor(live: number | null, value?: number): number {
+  if (live === null) return (value ?? 0) / 2
+  return snap(live) === undefined ? 0 : live
+}
+
+/** Estrella que se agranda bajo el dedo durante el arrastre; 0 en la franja de "sin calificar". */
+export function hotStarFor(live: number | null): number {
+  if (live === null || snap(live) === undefined) return 0
+  return starUnder(live)
+}
+
 /** "Sin calificar" o "3.5 / 5". */
 export function labelFor(rating?: number): string {
   if (!rating) return 'Sin calificar'
