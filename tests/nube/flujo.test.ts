@@ -29,6 +29,7 @@ import { signIn, signOut, signUp } from '../../src/cloud/auth'
 import {
   collectionFromDoc,
   createCollection,
+  forgetCollection,
   inviteLink,
   joinWithCode,
   leaveCollection,
@@ -61,6 +62,7 @@ let uidA = ''
 let uidB = ''
 let cid = ''
 let codigo = ''
+let codigoViejo = ''
 let disco: Album
 let deseo: WishlistItem
 let pararEspejo: (() => void) | undefined
@@ -203,6 +205,26 @@ describe('la colección de la familia', () => {
     const tipada = collectionFromDoc(cid, col!)
     expect(Object.keys(tipada.members).sort()).toEqual([uidA, uidB].sort())
     expect(tipada.inviteCode).toBe(codigo)
+  })
+
+  it('usar el enlace estando ya dentro no cambia nada: Ana sigue administrando y Luis sigue igual', async () => {
+    const antes = (await appVe('collections', cid))!
+    // Ana abre su propio enlace (por ejemplo en otro celular, al entrar con su cuenta).
+    await entrarComo(ANA)
+    expect(await joinWithCode(codigo)).toBe(cid)
+    let col = (await appVe('collections', cid))!
+    expect(col.members[uidA]).toEqual(antes.members[uidA])
+    expect(col.members[uidA].role).toBe('owner')
+    // El código con el que entró Luis sigue tal cual: la unión no se repitió.
+    expect(col.joinCode).toBe(antes.joinCode)
+    expect((await appVe('users', uidA))!.activeCollection).toBe(cid)
+
+    // Luis repite el suyo: sigue como editor, con la misma fecha de entrada.
+    await entrarComo(LUIS)
+    expect(await joinWithCode(codigo)).toBe(cid)
+    col = (await appVe('collections', cid))!
+    expect(col.members[uidB]).toEqual(antes.members[uidB])
+    expect(Object.keys(col.members).sort()).toEqual([uidA, uidB].sort())
   })
 
   it('el enlace de invitación lleva al código', () => {
@@ -408,6 +430,17 @@ describe('ajustes y salida', () => {
     expect((await luisVe('collections', cid))!.discogsToken).toBeUndefined()
   })
 
+  it('después de cambiar el nombre, crear otra colección no lo pisa', async () => {
+    expect(getAuthClient().currentUser!.displayName).toBe('Ana María')
+    const otra = await createCollection('Solo de Ana')
+    expect((await appVe('collections', otra))!.members[uidA]).toMatchObject({ name: 'Ana María', role: 'owner' })
+    const perfil = (await appVe('users', uidA))!
+    expect(perfil.name).toBe('Ana María')
+    expect(perfil.collections).toEqual([cid, otra])
+    expect(perfil.activeCollection).toBe(otra)
+    expect(getSession().person.name).toBe('Ana María')
+  })
+
   it('Luis se sale: ya no es miembro y su perfil olvida la colección', async () => {
     await entrarComo(LUIS)
     await leaveCollection(cid)
@@ -439,9 +472,43 @@ describe('ajustes y salida', () => {
     codigo = nuevo
   })
 
-  it('Ana saca a Luis de la colección', async () => {
+  it('Ana saca a Luis de la colección y el enlace que él tenía deja de servir', async () => {
     await entrarComo(ANA)
-    await removeMember(cid, uidB)
-    expect(Object.keys((await appVe('collections', cid))!.members)).toEqual([uidA])
+    const viejo = codigo
+    const nuevo = await removeMember(cid, uidB)
+    const col = (await appVe('collections', cid))!
+    expect(Object.keys(col.members)).toEqual([uidA])
+    expect(nuevo).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/)
+    expect(nuevo).not.toBe(viejo)
+    expect(col.inviteCode).toBe(nuevo)
+    expect(await appVe('invites', viejo)).toBeUndefined()
+    expect(await appVe('invites', nuevo)).toMatchObject({ collectionId: cid, createdBy: uidA })
+    await expect(previewInvite(viejo)).rejects.toThrow('Ese enlace ya no sirve')
+    codigo = nuevo
+    codigoViejo = viejo
+  })
+
+  it('Luis, ya fuera, no vuelve con el enlace viejo; limpia su perfil y crea su propia colección', async () => {
+    await entrarComo(LUIS)
+    // La nube ya no le deja ver la colección, pero su perfil todavía la lista (nadie más puede escribirlo).
+    await expect(appVe('collections', cid)).rejects.toThrow()
+    await expect(joinWithCode(codigoViejo)).rejects.toThrow('Ese enlace ya no sirve')
+    expect((await appVe('users', uidB))!.collections).toContain(cid)
+    await db.albums.add(discoDePrueba({ title: 'Copia ajena', collectionId: cid }))
+
+    // Es lo que hace la app al recibir "sin permiso" de la colección.
+    await forgetCollection(cid)
+    const perfil = (await appVe('users', uidB))!
+    expect(perfil.collections).not.toContain(cid)
+    expect(perfil.activeCollection).toBeUndefined()
+    expect(await db.albums.where('collectionId').equals(cid).count()).toBe(0)
+    // Salir de una colección en la que ya no se está tampoco falla.
+    await expect(leaveCollection(cid)).resolves.toBeUndefined()
+
+    const propia = await createCollection('La de Luis')
+    expect((await appVe('collections', propia))!.members[uidB]).toMatchObject({ name: 'Luis', role: 'owner' })
+    const despues = (await appVe('users', uidB))!
+    expect(despues.collections).toEqual([propia])
+    expect(despues.activeCollection).toBe(propia)
   })
 })

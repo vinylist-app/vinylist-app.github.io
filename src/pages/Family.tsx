@@ -192,7 +192,7 @@ export function Family() {
     setBusy(true)
     try {
       await removeMember(collection.id, picked.uid)
-      setMsg({ text: `${picked.member.name} ya no está en la colección.` })
+      setMsg({ text: `${picked.member.name} ya no está en la colección. Hay un enlace de invitación nuevo; el anterior ya no sirve.` })
       setSheet(null)
       setPicked(null)
     } catch (err) {
@@ -336,7 +336,7 @@ export function Family() {
       {sheet === 'member' && picked && (
         <CuentaSheet title={picked.member.name} onClose={() => { setSheet(null); setPicked(null) }}>
           <p className="muted" style={{ margin: 0 }}>{detailOf(picked.uid, picked.member)}</p>
-          <p className="muted" style={{ margin: 0 }}>Si la quitas, deja de ver la colección. Los discos que agregó se quedan.</p>
+          <p className="muted" style={{ margin: 0 }}>Si la quitas, deja de ver la colección y el enlace de invitación se renueva (el que tenía ya no sirve). Los discos que agregó se quedan.</p>
           <button className="cu-choice cu-choice--danger" onClick={remove} disabled={busy}>{busy ? 'Quitando…' : 'Quitar de la colección'}</button>
           <button className="btn btn--link btn--sm" onClick={() => { setSheet(null); setPicked(null) }}>Cancelar</button>
         </CuentaSheet>

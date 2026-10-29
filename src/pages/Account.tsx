@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSession } from '../session'
+import { getSession, useSession } from '../session'
 import { Logo } from '../components/Logo'
 import { BackIcon } from '../components/Icons'
 import { ChevronIcon, EyeIcon, EyeOffIcon, LinkIcon, LogoutIcon, PlusIcon } from '../components/CuentaIcons'
 import { UploadLocalOffer } from '../components/UploadLocalOffer'
 import { sendReset, signIn, signOut, signUp } from '../cloud/auth'
-import { createCollection, joinWithCode, localCounts, previewInvite, setActiveCollection } from '../cloud/collections'
+import { cloudErrorMessage, createCollection, joinWithCode, localCounts, previewInvite, setActiveCollection } from '../cloud/collections'
 import { clearPendingCode, initials, parseInviteCode, peopleLabel, readPendingCode } from '../lib/invite'
 import '../styles/cuenta.css'
 
@@ -18,6 +18,8 @@ import '../styles/cuenta.css'
 type Mode = 'enter' | 'create'
 type Step = 'choose' | 'create-collection' | 'join'
 interface UploadOffer { cid: string; albums: number; wishes: number }
+
+const JOIN_FAILED = 'No se pudo entrar a esa colección. Pide un enlace nuevo a tu familia.'
 
 export function Account() {
   const nav = useNavigate()
@@ -65,7 +67,10 @@ export function Account() {
       setError(null)
       try {
         const preview = await previewInvite(code)
-        if (memberships.some((m) => m.id === preview.collectionId) || collection?.id === preview.collectionId) {
+        // El perfil puede llegar después de entrar: se mira la sesión de ahora, no la del render.
+        // Y si aun así ya se era miembro, joinWithCode solo deja esa colección como la activa.
+        const s = getSession()
+        if (s.memberships.some((m) => m.id === preview.collectionId) || s.collection?.id === preview.collectionId) {
           await setActiveCollection(preview.collectionId)
           nav('/', { replace: true })
           return
@@ -73,7 +78,7 @@ export function Account() {
         const cid = await joinWithCode(code)
         await afterJoin(cid)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'No se pudo completar la invitación.')
+        setError(cloudErrorMessage(e, JOIN_FAILED))
       } finally {
         setBusy(false)
       }
@@ -124,7 +129,7 @@ export function Account() {
       const cid = await createCollection(collectionName)
       await afterJoin(cid)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear la colección.')
+      setError(cloudErrorMessage(err, 'No se pudo crear la colección. Intenta de nuevo.'))
     } finally {
       setBusy(false)
     }
@@ -143,7 +148,7 @@ export function Account() {
       const cid = await joinWithCode(code)
       await afterJoin(cid)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo entrar a esa colección.')
+      setError(cloudErrorMessage(err, JOIN_FAILED))
     } finally {
       setBusy(false)
     }
