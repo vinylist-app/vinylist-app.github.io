@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -65,6 +65,8 @@ export default defineConfig(({ mode }) => {
   ],
   test: {
     environment: 'node',
+    // Las pruebas de la nube necesitan el emulador de Firebase: corren aparte con `npm run test:nube`.
+    exclude: [...configDefaults.exclude, 'tests/nube/**'],
   },
   }
 })

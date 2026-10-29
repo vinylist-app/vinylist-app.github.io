@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:nube": "firebase emulators:exec --only auth,firestore --project demo-vinylist --config firebase/firebase.json \"vitest run --config tests/nube/vitest.config.ts\""
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",
@@ -22,9 +23,11 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "fake-indexeddb": "^6.2.6",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0",

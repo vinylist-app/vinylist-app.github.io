@@ -8,3 +8,7 @@ dev-dist
 
 # Árboles de trabajo temporales de las herramientas de Claude
 .claude/worktrees/
+# Bitácoras del emulador de Firebase (npm run test:nube)
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
