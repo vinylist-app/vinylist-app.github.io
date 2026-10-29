@@ -1,0 +1,104 @@
+/*
+ * Pantallas de cuenta, colección (familia), invitación y ajustes.
+ * Solo usa las variables de styles.css; prefijo `cu-` para no chocar con nada.
+ */
+
+/* Navegación de las pantallas sin barra (Cuenta, Unirme) */
+.cu-nav { display: flex; align-items: center; justify-content: space-between; margin: 0 -10px; }
+
+/* Logo grande centrado */
+.cu-logo { display: flex; justify-content: center; padding: 8px 0 4px; }
+
+/* Encabezado: título, ayuda */
+.cu-head { display: flex; flex-direction: column; gap: 8px; }
+.cu-head p { margin: 0; }
+
+/* Formulario de entrada */
+.cu-form { display: flex; flex-direction: column; gap: 10px; }
+.cu-form .btn { width: 100%; }
+.cu-pass { position: relative; }
+.cu-pass .input { padding-right: 52px; }
+.cu-pass__toggle { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; background: transparent; color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius); }
+.cu-hint { font-size: 13px; color: var(--text-2); }
+.cu-links { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cu-links .btn--link { min-height: 44px; font-weight: 600; }
+
+/* Opciones tipo tarjeta (crear / unirme) */
+.cu-options { display: flex; flex-direction: column; gap: 10px; }
+.cu-option { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; padding: 14px; text-align: left; border-radius: var(--radius); border: 1.5px solid var(--accent); background: var(--card); color: var(--text); }
+.cu-option:active { background: var(--card-2); }
+.cu-option__icon { flex: none; color: var(--accent); display: inline-flex; }
+.cu-option__title { font-weight: 700; font-size: 16px; font-family: var(--display); letter-spacing: -0.01em; }
+.cu-option__desc { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.cu-option__chev { flex: none; color: var(--text-2); }
+.cu-foot { margin: 0; text-align: center; font-size: 13px; color: var(--text-2); padding: 0 12px; }
+
+/* Resumen de la cuenta */
+.cu-summary { display: flex; align-items: center; gap: 14px; }
+.cu-summary__name { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+.cu-summary__mail { font-size: 14px; color: var(--text-2); overflow-wrap: anywhere; }
+
+/* Fila que lleva a otra pantalla (dentro de una tarjeta o lista) */
+.cu-link-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--text); text-align: left; font-weight: 600; }
+.cu-link-row > .cu-chev { margin-left: auto; color: var(--text-2); flex: none; }
+
+/* Lista de personas */
+.cu-people { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.cu-person { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); text-align: left; border-radius: 0; }
+button.cu-person:active { background: var(--card-2); }
+.cu-person__name { font-weight: 700; font-size: 16px; }
+.cu-person__detail { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.cu-medal { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: var(--on-brand); font-family: var(--display); font-weight: 700; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.02em; box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--brand); }
+.cu-medal--me { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--label); }
+.cu-medal--lg { width: 56px; height: 56px; font-size: 22px; }
+
+/* Tarjeta de estado de la nube */
+.cu-status { display: flex; align-items: flex-start; gap: 12px; }
+.cu-status__icon { flex: none; color: var(--accent); margin-top: 2px; }
+.cu-status__title { font-weight: 700; }
+.cu-status__detail { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.cu-status--error .cu-status__icon { color: var(--danger); }
+
+/* Aviso punteado */
+.cu-dashed { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--radius); border: 1.5px dashed var(--line); color: var(--text-2); font-size: 13px; line-height: 1.4; }
+.cu-dashed svg { flex: none; margin-top: 1px; }
+
+/* Sección Administrar */
+.cu-admin { display: flex; flex-direction: column; gap: 14px; }
+.cu-inline { display: flex; gap: 8px; align-items: center; }
+.cu-inline .input { flex: 1; min-width: 0; }
+.cu-code { font-family: var(--mono); font-size: 28px; letter-spacing: 0.18em; font-weight: 600; text-align: center; padding: 12px; border-radius: var(--radius); background: var(--card-2); color: var(--text); }
+.cu-url { font-family: var(--mono); font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; text-align: center; }
+.cu-ext { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 600; }
+
+/* Botón fijo encima de la barra de pestañas */
+.cu-page--fixed { padding-bottom: calc(176px + var(--safe-bottom)); }
+.cu-fixed { position: fixed; left: 20px; right: 20px; bottom: calc(84px + var(--safe-bottom)); max-width: 680px; margin: 0 auto; z-index: 9; }
+.cu-fixed .btn { width: 100%; box-shadow: 0 8px 24px rgba(5, 20, 21, 0.18); }
+
+/* Ajustes: filas que se tocan */
+.cu-srow { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; text-align: left; min-height: 48px; color: var(--text); }
+.cu-srow:last-child { border-bottom: 0; }
+.cu-srow > span:last-child { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.cu-srow:active { background: var(--card-2); }
+.cu-srow .cu-chev { color: var(--text-2); }
+.cu-name-edit { display: flex; align-items: center; gap: 6px; }
+.cu-name-edit .icon-btn { border-color: transparent; background: transparent; color: var(--text-2); width: 40px; height: 40px; }
+
+/* Hoja: opciones (apariencia, acciones de persona) */
+.cu-sheet-title { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+.cu-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px; padding: 12px 14px; border-radius: var(--radius); border: 1.5px solid var(--line); background: var(--card); color: var(--text); font-weight: 600; text-align: left; }
+.cu-choice--on { border-color: var(--accent); color: var(--accent); }
+.cu-choice--danger { border-color: var(--danger); color: var(--danger); }
+.cu-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.cu-steps li::marker { font-family: var(--mono); color: var(--accent); }
+
+/* Progreso de subida */
+.cu-progress { display: flex; flex-direction: column; gap: 8px; }
+
+/* Foco visible en todo lo que se toca */
+.cu-option:focus-visible, .cu-person:focus-visible, .cu-srow:focus-visible, .cu-choice:focus-visible, .cu-link-row:focus-visible, .cu-pass__toggle:focus-visible { outline: 2px solid var(--label); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .cu-option, .cu-choice, .cu-srow { transition: background-color 120ms ease; }
+}
