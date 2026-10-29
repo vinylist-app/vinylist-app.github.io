@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ariaTextFor, averageOf, fillFor, formatAverage, labelFor, saveButton, saveLabelFor, snap, starUnder, stepRating, tapValue, valueAt } from './starSlider'
+import { ariaTextFor, averageOf, fillFor, formatAverage, hotStarFor, labelFor, saveButton, saveLabelFor, shownStarsFor, snap, starUnder, stepRating, tapValue, valueAt } from './starSlider'
 
 // Un riel de 300 px que empieza en x=100, sin margen: cada estrella mide 60 px.
 const rect = { left: 100, width: 300 }
@@ -87,6 +87,35 @@ describe('starUnder: la estrella bajo el dedo', () => {
     expect(starUnder(1)).toBe(1)
     expect(starUnder(1.01)).toBe(2)
     expect(starUnder(5)).toBe(5)
+  })
+})
+
+describe('shownStarsFor: lo que se pinta mientras se arrastra', () => {
+  it('sin dedo encima pinta la calificación guardada (1..10 → 0.5..5)', () => {
+    expect(shownStarsFor(null, undefined)).toBe(0)
+    expect(shownStarsFor(null, 7)).toBe(3.5)
+  })
+  it('con el dedo encima sigue el valor continuo', () => {
+    expect(shownStarsFor(2.3, 7)).toBe(2.3)
+    expect(shownStarsFor(0.25, 7)).toBe(0.25)
+  })
+  it('por debajo de un cuarto de estrella las cinco se ven vacías, igual que dice la etiqueta', () => {
+    expect(shownStarsFor(0.1, 7)).toBe(0)
+    expect(shownStarsFor(0.24, 7)).toBe(0)
+    expect([1, 2, 3, 4, 5].map((i) => fillFor(shownStarsFor(0.2, 7), i))).toEqual([0, 0, 0, 0, 0])
+  })
+})
+
+describe('hotStarFor: la estrella que se agranda bajo el dedo', () => {
+  it('ninguna sin dedo ni en la franja de "sin calificar"', () => {
+    expect(hotStarFor(null)).toBe(0)
+    expect(hotStarFor(0)).toBe(0)
+    expect(hotStarFor(0.2)).toBe(0)
+  })
+  it('desde un cuarto de estrella es la que queda bajo el dedo', () => {
+    expect(hotStarFor(0.25)).toBe(1)
+    expect(hotStarFor(1.5)).toBe(2)
+    expect(hotStarFor(5)).toBe(5)
   })
 })
 

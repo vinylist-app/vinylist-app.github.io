@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { StarPath } from './Icons'
-import { ariaTextFor, fillFor, snap, starUnder, stepRating, tapValue, valueAt } from '../lib/starSlider'
+import { ariaTextFor, fillFor, hotStarFor, shownStarsFor, snap, stepRating, tapValue, valueAt } from '../lib/starSlider'
 import '../styles/calificar.css'
 
 interface Props {
@@ -35,8 +35,8 @@ export function StarSlider({ value, onChange, onPreview, size = 48, showScale = 
   const [dragging, setDragging] = useState(false)
 
   const starsWidth = size * 5
-  const shownStars = live !== null ? live : (value ?? 0) / 2
-  const hot = dragging && live !== null ? starUnder(live) : 0
+  const shownStars = shownStarsFor(live, value)
+  const hot = dragging ? hotStarFor(live) : 0
   const previewRating = live !== null ? snap(live) : value
 
   function valueFrom(e: PointerEvent<HTMLDivElement>): number {

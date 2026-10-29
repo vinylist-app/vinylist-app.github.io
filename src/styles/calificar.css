@@ -22,20 +22,30 @@
 }
 
 /* ---------- La hoja "Calificar" ---------- */
-.cal-sheet { align-items: center; text-align: center; gap: 12px; }
+/* La hoja apila asa 5 + nav 44 + portada 120 + título y meta ≈50 + eyebrow ≈20 + riel ≈91 + medallón 88 +
+   ayuda (3 líneas) ≈65 + pista (2 líneas) ≈36 + botón 56 = 575, más 9 huecos de 10 px y relleno 12 + 24 + safe-bottom:
+   ≈735 px en un iPhone de 390×844 (safe-bottom 34), que caben sin desplazarse porque la hoja puede crecer casi hasta
+   arriba. Donde no cabe (Safari con barras, celulares bajos) el botón de guardar se queda pegado abajo. */
+.cal-sheet { align-items: center; text-align: center; }
+/* Con el mismo peso que .sheet__panel ganaría la regla que se cargue después (calificar.css entra antes que styles.css),
+   así que estas dos van con el selector compuesto. */
+.sheet__panel.cal-sheet { gap: 10px; max-height: calc(100dvh - var(--safe-top) - 16px); }
 .cal-sheet__nav { align-self: stretch; display: flex; justify-content: space-between; align-items: center; margin: 0 -10px; }
 .cal-sheet__nav .btn { max-width: 60%; }
 .cal-sheet__nav .btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-sheet__cover { width: 150px; height: 150px; border-radius: 3px; object-fit: cover; background: var(--card-2); border: 1.5px solid var(--accent); }
+.cal-sheet__cover { width: 120px; height: 120px; border-radius: 3px; object-fit: cover; background: var(--card-2); border: 1.5px solid var(--accent); }
 .cal-sheet__cover.cover--placeholder { font-size: 18px; padding: 10px; align-items: flex-end; }
 .cal-sheet h2 { font-size: 26px; }
 .cal-sheet .cal-slider { margin-top: 6px; }
-.cal-medal { width: 80px; height: 80px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 28px; letter-spacing: -0.02em; font-variation-settings: 'opsz' 96; box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 4.5px var(--accent); margin: 8px 0; }
-.cal-medal--empty { background: transparent; color: var(--accent); border: 1.5px dashed var(--accent); box-shadow: none; }
+.cal-medal { width: 80px; height: 80px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 28px; letter-spacing: -0.02em; font-variation-settings: 'opsz' 96; box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 4.5px var(--accent); margin: 4px 0; }
+/* Sin calificar: círculo punteado con la palabra, sin número ni guion (spec §2). */
+.cal-medal--empty { background: transparent; color: var(--accent); border: 1.5px dashed var(--accent); box-shadow: none; font-family: var(--body); font-size: 13px; font-weight: 600; letter-spacing: 0; line-height: 1.15; padding: 0 10px; font-variation-settings: normal; }
 .cal-sheet__help { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text); max-width: 340px; }
 .cal-sheet__help b { font-weight: 700; }
 .cal-sheet__hint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-2); max-width: 340px; }
-.cal-sheet__save { align-self: stretch; margin-top: 8px; }
+/* Pegajoso: si la hoja desborda, el botón sigue a la vista. En reposo queda en su sitio porque el desplazamiento
+   coincide con el relleno inferior del panel; el halo del color del fondo separa el texto que pasa por debajo. */
+.cal-sheet__save { align-self: stretch; margin-top: 8px; position: sticky; bottom: calc(24px + var(--safe-bottom)); z-index: 1; box-shadow: 0 0 0 6px var(--bg-2); }
 
 /* ---------- Ficha: fila de calificación ---------- */
 .cal-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 12px 0; margin: 0; border: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); text-align: left; font: inherit; }
