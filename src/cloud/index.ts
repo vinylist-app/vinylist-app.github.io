@@ -39,6 +39,8 @@ export function startCloud(): void {
   onAuth((user) => {
     clearAll()
     if (!user) {
+      // Sin sesión no hay colección que recordar: así el próximo arranque no consulta la de otra cuenta.
+      rememberCollectionId(undefined)
       setSession({ status: 'signed-out', person: { uid: LOCAL_UID, name: getProfileName() }, collection: null, memberships: [], sync: { state: 'local' } })
       return
     }

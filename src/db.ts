@@ -3,6 +3,7 @@ import type { Album, WishlistItem } from './types'
 import { activeCollectionId, getSession, LOCAL_COLLECTION, LOCAL_UID } from './session'
 import { cloudWrites } from './cloud/bridge'
 import { albumKey } from './lib/text'
+import { normalizeLocalWish } from './data/pure'
 
 /**
  * Base local (IndexedDB). La app funciona sin internet con esto.
@@ -43,14 +44,23 @@ class VinyListDB extends Dexie {
       const wishlist = tx.table('wishlist')
       return Promise.all([
         albums.toCollection().modify((a: Album) => { if (!a.collectionId) a.collectionId = LOCAL_COLLECTION }),
-        wishlist.toCollection().modify((w: WishlistItem) => {
-          if (!w.collectionId) w.collectionId = LOCAL_COLLECTION
-          if (!w.wantedByName) w.wantedByName = w.wantedBy
-          if (w.reservedBy && !w.reservedByName) w.reservedByName = w.reservedBy
-        }),
+        wishlist.toCollection().modify(normalizeWishInPlace),
       ])
     })
+    // v0.2.1: la versión 3 original dejó los deseos de v0.1 con el nombre del perfil
+    // como uid, y la app ya no los reconocía como propios. Quien ya pasó por esa
+    // versión los corrige aquí (misma regla; para los demás no cambia nada).
+    this.version(4).stores({
+      albums: 'id, collectionId, artist, title, year, barcode, discogsId, discogsMasterId, musicbrainzReleaseGroupId, rating, addedAt, spotifyAlbumId, *genres, *styles',
+      wishlist: 'id, collectionId, wantedBy, addedAt',
+      tasteCache: 'key, fetchedAt',
+    }).upgrade((tx) => tx.table('wishlist').toCollection().modify(normalizeWishInPlace))
   }
+}
+
+/** Aplica normalizeLocalWish sobre la fila que Dexie entrega en una migración. */
+function normalizeWishInPlace(w: WishlistItem): void {
+  Object.assign(w, normalizeLocalWish(w))
 }
 
 export const db = new VinyListDB()

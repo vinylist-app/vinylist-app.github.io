@@ -30,7 +30,10 @@ export function setLocalDiscogsToken(t: string): void {
 }
 
 function token(): string | undefined {
-  return getSession().collection?.discogsToken || localDiscogsToken() || import.meta.env.VITE_DISCOGS_TOKEN || undefined
+  // El token de .env es solo para desarrollo: al compilar para producción quedaría
+  // escrito en el JS público (vite.config.ts además lo vacía en el build).
+  const dev = import.meta.env.DEV ? import.meta.env.VITE_DISCOGS_TOKEN : undefined
+  return getSession().collection?.discogsToken || localDiscogsToken() || dev || undefined
 }
 
 export function discogsConfigured(): boolean {
