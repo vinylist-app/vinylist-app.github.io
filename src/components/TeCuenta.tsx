@@ -100,7 +100,7 @@ export function TeCuentaCard({ data }: { data: TeCuentaData }) {
       </div>
 
       {facts.length === 0 && status !== 'loading' && (
-        <p className="muted" style={{ margin: 0 }}>Todavía no tengo nada que contarte de este disco. Lo que sé de él está abajo.</p>
+        <p className="muted" style={{ margin: 0 }}>{status === 'offline' ? 'Sin internet no puedo contarte más de este disco; lo intento cuando vuelvas a tener conexión.' : 'Todavía no tengo nada que contarte de este disco.'}</p>
       )}
 
       {facts.length > 0 && (
