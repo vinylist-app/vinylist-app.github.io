@@ -261,6 +261,10 @@ export function Settings() {
 
       <section className="stack" style={{ gap: 0 }}>
         <span className="eyebrow">VinyList</span>
+        <button className="settings-row cu-srow" onClick={() => nav('/numeros')} disabled={albums.length === 0}>
+          <span>En números</span>
+          <span>{albums.length === 0 ? 'Sin discos' : `${albums.length} ${albums.length === 1 ? 'disco' : 'discos'}`}{albums.length > 0 && <ChevronIcon className="cu-chev" width={18} height={18} />}</span>
+        </button>
         <button className="settings-row cu-srow" onClick={() => setSheet('theme')}>
           <span>Apariencia</span>
           <span>{THEME_LABELS[theme]}<ChevronIcon className="cu-chev" width={18} height={18} /></span>

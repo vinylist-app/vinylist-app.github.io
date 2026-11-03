@@ -15,6 +15,8 @@ const Scan = lazy(() => import('./pages/Scan').then((m) => ({ default: m.Scan })
 const Account = lazy(() => import('./pages/Account').then((m) => ({ default: m.Account })))
 const Family = lazy(() => import('./pages/Family').then((m) => ({ default: m.Family })))
 const Join = lazy(() => import('./pages/Join').then((m) => ({ default: m.Join })))
+// "En números" trae sus figuras y cálculos; se carga al entrar.
+const Numeros = lazy(() => import('./pages/Numeros').then((m) => ({ default: m.Numeros })))
 
 const Loading = () => <main className="page"><p className="muted">Cargando…</p></main>
 
@@ -35,6 +37,7 @@ function Shell() {
         <Route path="/para-ti" element={<ForYou />} />
         <Route path="/deseos" element={<Wishlist />} />
         <Route path="/ajustes" element={<Settings />} />
+        <Route path="/numeros" element={<Suspense fallback={<Loading />}><Numeros /></Suspense>} />
         <Route path="/cuenta" element={<Suspense fallback={<Loading />}><Account /></Suspense>} />
         <Route path="/coleccion" element={<Suspense fallback={<Loading />}><Family /></Suspense>} />
         <Route path="/unirme/:code" element={<Suspense fallback={<Loading />}><Join /></Suspense>} />

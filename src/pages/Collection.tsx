@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAlbums } from '../data/hooks'
-import { applyFilters, collectDecades, collectGenres, DEFAULT_FILTERS, type Filters } from '../lib/filters'
+import { applyFilters, collectDecades, collectGenres, filtersFromParams, type Filters } from '../lib/filters'
 import { AlbumCard } from '../components/AlbumCard'
-import { SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
+import { BarsIcon, SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
 
 const SORTS: { value: Filters['sort']; label: string }[] = [
@@ -19,7 +19,9 @@ export function Collection() {
   // undefined mientras la base responde o la sesión arranca: se muestra "Cargando…", no el vacío de bienvenida.
   const cargando = loaded === undefined
   const albums = loaded ?? []
-  const [f, setF] = useState<Filters>(DEFAULT_FILTERS)
+  // Los filtros iniciales pueden venir en la URL ("Ver en la colección" desde En números); no se sincronizan de vuelta.
+  const [params] = useSearchParams()
+  const [f, setF] = useState<Filters>(() => filtersFromParams(params))
   const genres = useMemo(() => collectGenres(albums).slice(0, 12), [albums])
   const decades = useMemo(() => collectDecades(albums), [albums])
   const shown = useMemo(() => applyFilters(albums, f), [albums, f])
@@ -43,7 +45,10 @@ export function Collection() {
             {!cargando && <span className="badge">{filtrado ? `${shown.length} de ${albums.length}` : `${albums.length} ${albums.length === 1 ? 'disco' : 'discos'}`}</span>}
           </div>
         </div>
-        <Link to="/ajustes" className="icon-btn icon-btn--ghost" aria-label="Ajustes"><SettingsIcon /></Link>
+        <div className="row" style={{ gap: 0 }}>
+          {albums.length > 0 && <Link to="/numeros" className="icon-btn icon-btn--ghost" aria-label="En números" style={{ marginRight: 0 }}><BarsIcon /></Link>}
+          <Link to="/ajustes" className="icon-btn icon-btn--ghost" aria-label="Ajustes"><SettingsIcon /></Link>
+        </div>
       </div>
 
       {albums.length > 0 && (

@@ -10,6 +10,25 @@ export interface Filters {
 
 export const DEFAULT_FILTERS: Filters = { query: '', sort: 'recent' }
 
+const SORTS: Filters['sort'][] = ['recent', 'artist', 'title', 'year', 'rating']
+
+/**
+ * Filtros iniciales desde la URL (`/?q=Coldplay`, `?genero=Rock`, `?decada=2020`, `?orden=rating`):
+ * así "Ver en la colección" desde En números abre la Colección ya filtrada. Lo que no se entiende se ignora.
+ */
+export function filtersFromParams(p: URLSearchParams): Filters {
+  const f: Filters = { ...DEFAULT_FILTERS }
+  const q = p.get('q')
+  if (q) f.query = q
+  const genre = p.get('genero')
+  if (genre) f.genre = genre
+  const decade = Number(p.get('decada'))
+  if (p.get('decada') && Number.isInteger(decade) && decade > 0) f.decade = decade
+  const sort = p.get('orden') as Filters['sort'] | null
+  if (sort && SORTS.includes(sort)) f.sort = sort
+  return f
+}
+
 /** Quita acentos y mayúsculas para que "cafe tacuba" encuentre "Café Tacvba". */
 export function normalize(s: string): string {
   return s
