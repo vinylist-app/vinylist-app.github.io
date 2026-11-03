@@ -22,8 +22,9 @@ export function filtersFromParams(p: URLSearchParams): Filters {
   if (q) f.query = q
   const genre = p.get('genero')
   if (genre) f.genre = genre
+  // Cualquier año vale ("?decada=2025" → 2020); fuera de 1000–9999 se ignora.
   const decade = Number(p.get('decada'))
-  if (p.get('decada') && Number.isInteger(decade) && decade > 0) f.decade = decade
+  if (p.get('decada') && Number.isInteger(decade) && decade >= 1000 && decade <= 9999) f.decade = Math.floor(decade / 10) * 10
   const sort = p.get('orden') as Filters['sort'] | null
   if (sort && SORTS.includes(sort)) f.sort = sort
   return f
@@ -38,6 +39,8 @@ export function normalize(s: string): string {
     .trim()
 }
 
+export function decadeOf(year: number): number
+export function decadeOf(year?: number): number | undefined
 export function decadeOf(year?: number): number | undefined {
   if (!year) return undefined
   return Math.floor(year / 10) * 10

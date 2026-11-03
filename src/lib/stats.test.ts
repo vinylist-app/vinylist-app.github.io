@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { artistStats, casual, conditionStats, decadeStats, familyStats, growthStats, hasChart, heroStats, labelStats, moneyStats, parseDuration, sentence, starStats, tagStats, yearsOf } from './stats'
-import { filtersFromParams } from './filters'
+import { artistStats, casual, conditionStats, copyStats, decadeStats, familyStats, growthStats, hasChart, heroStats, labelStats, moneyStats, monthShort, parseDuration, sentence, starStats, tagStats, tick2, yearsOf } from './stats'
 import type { Album } from '../types'
 
 const base = { collectionId: 'local', genres: [], styles: [], tracklist: [], addedAt: '2026-01-01T12:00:00.000Z', updatedAt: '2026-01-01T12:00:00.000Z' }
@@ -12,6 +11,10 @@ function disc(p: Partial<Album> & { artist?: string }): Album {
 /** n discos iguales en lo que se pida. */
 function many(n: number, p: Partial<Album>): Album[] {
   return Array.from({ length: n }, () => disc(p))
+}
+/** Marca de tiempo ISO de una fecha y hora LOCALES (mes 1–12): B1 agrupa por fecha local, así la prueba no depende de la zona horaria. */
+function iso(y: number, m: number, d: number, h = 12): string {
+  return new Date(y, m - 1, d, h).toISOString()
 }
 
 describe('regla general de gráfica', () => {
@@ -40,6 +43,7 @@ describe('A1 · artistas', () => {
     expect(artistStats(['A', 'B', 'C', 'D', 'E'].map((artist) => disc({ artist }))).lead).toBe('Un disco de cada uno: 5 artistas.')
     expect(artistStats([...many(2, { artist: 'A' }), ...many(2, { artist: 'B' }), ...many(2, { artist: 'C' })]).lead).toBe('A, B y 1 más empatan con 2.')
     expect(artistStats([disc({ artist: 'Coldplay' })]).lead).toBe('Tu único disco es de Coldplay.')
+    expect(artistStats([disc({ artist: 'Coldplay' }), ...many(2, { artist: 'Various Artists' })]).lead).toBe('Tu único disco con artista es de Coldplay.')
   })
 })
 
@@ -67,13 +71,30 @@ describe('A2 · décadas y años', () => {
     expect(lead({ 2025: 4, 1995: 3, 1975: 3 })).toBe('Tu década más fuerte son los años 2020, con 4 discos: coleccionas lo de ahora.')
     expect(lead({ 2015: 3, 2025: 3, 1995: 1 })).toBe('Los años 2010 y 2020 empatan: 3 discos cada una.')
   })
+  it('la década por defecto con empate es la más reciente', () => {
+    expect(decadeStats([...many(3, { year: 2015 }), ...many(3, { year: 2025 }), disc({ year: 1995 })], now).top).toBe(2020)
+  })
   it('sin gráfica dice de qué años van; sin años, lo dice', () => {
     const s = decadeStats([disc({ year: 1971, addedAt: '2026-01-02' }), disc({ year: 1998 }), disc({ year: 2024 })], now)
     expect(s.chart).toBe(false)
+    expect(s.chartYears).toBe(false)
     expect(s.lead).toBe('Tus discos van de 1971 a 2024.')
     expect(s.oldest?.album.year).toBe(1971)
     expect(s.newest?.album.year).toBe(2024)
-    expect(decadeStats([disc({}), disc({})], now).lead).toBe('Tus discos todavía no traen año.')
+    expect(decadeStats([disc({ year: 1971 }), disc({})], now).lead).toBe('Tu disco es de 1971.')
+    expect(decadeStats([disc({}), disc({})], now)).toMatchObject({ lead: 'Tus discos todavía no traen año.', decades: [], chart: false, chartYears: false })
+  })
+  it('toda la colección en una sola década: sin columnas de décadas pero con las de año, y el lead por bandas', () => {
+    const s = decadeStats([...many(6, { year: 2021 }), ...many(4, { year: 2025 })], now)
+    expect(s.chart).toBe(false)
+    expect(s.chartYears).toBe(true)
+    expect(s.top).toBe(2020)
+    expect(s.lead).toBe('Casi todo lo tuyo salió en los años 2020: coleccionas lo de ahora.')
+    // Dos discos del mismo año: ni décadas ni años merecen gráfica, pero la frase sigue siendo la de la banda.
+    expect(decadeStats(many(2, { year: 2021 }), now)).toMatchObject({ chart: false, chartYears: false, lead: 'Casi todo lo tuyo salió en los años 2020: coleccionas lo de ahora.' })
+  })
+  it('ticks de dos dígitos', () => {
+    expect([2000, 1970, 2025].map(tick2)).toEqual(['00', '70', '25'])
   })
   it('el más viejo con empate: el agregado primero y cuántos más', () => {
     const s = decadeStats([disc({ year: 1969, title: 'Tarde', addedAt: '2026-02-01' }), disc({ year: 1969, title: 'Temprano', addedAt: '2026-01-01' }), ...many(2, { year: 2020 })], now)
@@ -147,6 +168,8 @@ describe('héroe · horas', () => {
     expect(parseDuration('1:02:30')).toBe(3750)
     expect(parseDuration('')).toBeUndefined()
     expect(parseDuration('cuatro')).toBeUndefined()
+    expect(parseDuration('12:60')).toBeUndefined()
+    expect(parseDuration('0:00')).toBe(0)
   })
   it('suma horas, canciones y artistas, y dice de cuántos discos salen', () => {
     const s = heroStats([
@@ -158,12 +181,15 @@ describe('héroe · horas', () => {
     expect(heroStats([disc({ tracklist: [{ position: '1', title: 't', duration: '12:00' }] })]).hours).toBe('12 min')
     expect(heroStats([disc({})])).toMatchObject({ hours: '—', songs: '—', note: 'Sin canciones todavía: con Discogs se llenan' })
   })
+  it('canciones sin duración (o en 0:00) no cuentan como duración', () => {
+    expect(heroStats([disc({ tracklist: [{ position: '1', title: 't' }, { position: '2', title: 't', duration: '0:00' }] })])).toMatchObject({ hours: '—', songs: '2', withDurations: 0, note: 'Tus canciones todavía no traen duración' })
+  })
 })
 
 describe('B1 · crecimiento', () => {
   const now = new Date(2026, 10, 3, 12)
   it('los últimos doce meses con el actual en 0', () => {
-    const s = growthStats([...many(3, { addedAt: '2026-08-10T15:00:00.000Z' }), disc({ addedAt: '2025-10-19T13:00:00.000Z' }), disc({ addedAt: '2026-03-02T13:00:00.000Z' })], now)
+    const s = growthStats([...many(3, { addedAt: iso(2026, 8, 10) }), disc({ addedAt: iso(2025, 10, 19) }), disc({ addedAt: iso(2026, 3, 2) })], now)
     expect(s.months.map((m) => m.tick)).toEqual(['dic', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov'])
     expect(s.months.map((m) => m.count)).toEqual([0, 0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 0])
     expect(s.lead).toBe('Tu mes más intenso: agosto de 2026, con 3 discos.')
@@ -171,13 +197,27 @@ describe('B1 · crecimiento', () => {
     expect(s.chart).toBe(true)
   })
   it('un respaldo (≥ 80 % el mismo día, ≥ 10 discos) no se lee como racha', () => {
-    const s = growthStats([...many(9, { addedAt: '2026-06-14T18:00:00.000Z' }), disc({ addedAt: '2026-02-01T18:00:00.000Z' })], now)
+    const s = growthStats([...many(9, { addedAt: iso(2026, 6, 14) }), disc({ addedAt: iso(2026, 2, 1) })], now)
     expect(s.backup).toBe(true)
     expect(s.lead).toBe('9 discos entraron de golpe el 14 jun 2026: un respaldo.')
-    expect(growthStats([...many(7, { addedAt: '2026-06-14T18:00:00.000Z' }), disc({ addedAt: '2026-02-01T18:00:00.000Z' })], now).backup).toBe(false)
+    expect(growthStats([...many(7, { addedAt: iso(2026, 6, 14) }), disc({ addedAt: iso(2026, 2, 1) })], now).backup).toBe(false)
   })
   it('un solo mes con datos', () => {
-    expect(growthStats(many(2, { addedAt: '2026-11-01T18:00:00.000Z' }), now).lead).toBe('Todo lo agregaste en noviembre de 2026.')
+    expect(growthStats(many(2, { addedAt: iso(2026, 11, 1) }), now).lead).toBe('Todo lo agregaste en noviembre de 2026.')
+  })
+  it('el mes más intenso fuera de los doce meses de la gráfica lo dice', () => {
+    const s = growthStats([...many(8, { addedAt: iso(2024, 5, 10) }), ...many(3, { addedAt: iso(2026, 10, 2) }), ...many(2, { addedAt: iso(2026, 9, 2) })], now)
+    expect(s.lead).toBe('Tu mes más intenso: mayo de 2024, con 8 discos (antes de estos doce meses).')
+    expect(Math.max(...s.months.map((m) => m.count))).toBe(3)
+    expect(s.sub).toBe('Este año llevas 5 · desde el 10 may 2024')
+    // Un respaldo viejo: la frase sigue siendo verdad aunque las doce columnas vayan en 0.
+    expect(growthStats(many(12, { addedAt: iso(2024, 5, 10) }), now)).toMatchObject({ lead: '12 discos entraron de golpe el 10 may 2024: un respaldo.', chart: false })
+  })
+  it('sin fechas legibles no deja la tarjeta vacía', () => {
+    expect(growthStats(many(2, { addedAt: 'ayer' }), now)).toMatchObject({ lead: 'Tus discos no traen fecha de alta.', sub: '', chart: false })
+  })
+  it('ticks de tres letras sin punto', () => {
+    expect([0, 8, 11].map((m) => monthShort(new Date(2026, m, 1)))).toEqual(['ene', 'sep', 'dic'])
   })
 })
 
@@ -190,6 +230,13 @@ describe('B2 · condición', () => {
   })
   it('con menos de cinco pide anotar el estado', () => {
     expect(conditionStats(many(4, { mediaCondition: 'M' }), 'mediaCondition')).toMatchObject({ enough: false, lead: 'Anota el estado de tus discos en la ficha y aquí te sale cómo están.' })
+  })
+  it('formato en singular y plural, países en español con "y N más", y si hay funda', () => {
+    const s = copyStats([...many(2, { format: 'LP', country: 'US' }), disc({ format: '2xLP', country: 'Mexico' }), disc({ format: '7"', country: 'Germany' }), disc({ format: 'Box Set', country: 'Japan', sleeveCondition: 'NM' }), disc({})])
+    expect(s.formatLine).toBe('2 LP · 1 doble · 1 sencillo de 7" · 1 Box Set · 1 sin formato')
+    expect(s.countryLine).toBe('US 2 · Alemania 1 · Japón 1 · y 1 más')
+    expect(s.anySleeve).toBe(true)
+    expect(copyStats([...many(21, { format: '2xLP' }), ...many(2, { format: '7"' })])).toMatchObject({ formatLine: '21 dobles · 2 sencillos de 7"', countryLine: undefined, anySleeve: false })
   })
 })
 
@@ -211,12 +258,5 @@ describe('B4 · familia', () => {
     expect(s.without).toBe(1)
     // Empate en calificados: por nombre.
     expect(s.raters).toEqual([{ uid: 'u2', name: 'Ana', count: 3, avg: 5 }, { uid: 'u1', name: 'Santiago', count: 3, avg: 4 }])
-  })
-})
-
-describe('Colección · filtros desde la URL', () => {
-  it('lee q, genero, decada y orden; ignora lo inválido', () => {
-    expect(filtersFromParams(new URLSearchParams('q=Coldplay&genero=Rock&decada=2020&orden=rating'))).toEqual({ query: 'Coldplay', genre: 'Rock', decade: 2020, sort: 'rating' })
-    expect(filtersFromParams(new URLSearchParams('decada=abc&orden=nada'))).toEqual({ query: '', sort: 'recent' })
   })
 })

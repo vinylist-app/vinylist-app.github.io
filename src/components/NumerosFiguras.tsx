@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { discos } from '../lib/stats'
 
 /**
@@ -8,11 +8,11 @@ import { discos } from '../lib/stats'
  * --viz-bar y sus hermanas bajan a --viz-dim; el readout lo arma la pantalla.
  */
 
-/** Ancho real del contenedor, para dibujar cada SVG al tamaño exacto. */
+/** Ancho real del contenedor, para dibujar cada SVG al tamaño exacto (se mide antes de pintar: el primer cuadro ya va al ancho real). */
 export function useWidth<T extends HTMLElement>(fallback = 320): [RefObject<T | null>, number] {
   const ref = useRef<T>(null)
   const [w, setW] = useState(fallback)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const update = () => { const cw = el.clientWidth; if (cw > 0) setW(cw) }
@@ -98,10 +98,11 @@ export function Columns({ cols, selected, onSelect, label }: { cols: ColDatum[];
           )
         })}
       </svg>
-      {/* La ranura completa es el blanco táctil: botones de verdad encima del dibujo (foco y tap nativos). */}
+      {/* La ranura completa es el blanco táctil: botones de verdad encima del dibujo (foco y tap nativos).
+          Una columna en 0 no tiene nada que seleccionar: su botón va deshabilitado, pero conserva el nombre para el lector de pantalla. */}
       <div className="nu-cols__hits" role="group" aria-label={label}>
         {cols.map((c) => (
-          <button key={c.key} type="button" className="nu-col__hit" aria-label={`${c.name}, ${discos(c.count)}`} aria-pressed={selected === c.key} onClick={() => onSelect(c.key)} />
+          <button key={c.key} type="button" className="nu-col__hit" aria-label={`${c.name}, ${discos(c.count)}`} aria-pressed={selected === c.key} disabled={c.count === 0} onClick={() => onSelect(c.key)} />
         ))}
       </div>
     </div>
@@ -127,6 +128,29 @@ export function segFill(step: number): string {
   return step > 0 ? `var(--viz-${step})` : 'var(--viz-nd)'
 }
 
+/**
+ * Blancos táctiles de la barra alta: una partición del riel, sin encimarse. Cada bloque recibe
+ * su ancho (más la mitad de cada hueco) y los angostos crecen hasta `min` a costa de los vecinos
+ * que tengan de sobra; si ningún vecino puede ceder, se quedan con lo que hay.
+ */
+export function hitSpans(blocks: { x: number; w: number }[], width: number, min = 24): { left: number; width: number }[] {
+  const n = blocks.length
+  if (n === 0) return []
+  const b: number[] = [0]
+  for (let i = 1; i < n; i++) b.push((blocks[i - 1].x + blocks[i - 1].w + blocks[i].x) / 2)
+  b.push(Math.max(width, blocks[n - 1].x + blocks[n - 1].w))
+  for (let i = 0; i < n; i++) {
+    let need = min - (b[i + 1] - b[i])
+    if (need <= 0) continue
+    const fromLeft = i > 0 ? Math.min(need, Math.max(0, b[i] - b[i - 1] - min)) : 0
+    b[i] -= fromLeft
+    need -= fromLeft
+    const fromRight = i < n - 1 ? Math.min(need, Math.max(0, b[i + 2] - b[i + 1] - min)) : 0
+    b[i + 1] += fromRight
+  }
+  return blocks.map((_, i) => ({ left: b[i], width: b[i + 1] - b[i] }))
+}
+
 export function SegBar({ segs, selected, onSelect, label, describe }: { segs: SegDatum[]; selected: string | null; onSelect: (key: string) => void; label: string; describe: (s: SegDatum) => string }) {
   const [ref, width] = useWidth<HTMLDivElement>()
   const visible = segs.filter((s) => s.count > 0)
@@ -139,8 +163,7 @@ export function SegBar({ segs, selected, onSelect, label, describe }: { segs: Se
     x += w + SEG_GAP
     return out
   })
-  // Los bloques chicos van al final para quedar encima: su blanco táctil mide al menos 24 px.
-  const hits = [...placed].sort((a, b) => b.w - a.w)
+  const spans = hitSpans(placed, width)
   return (
     <div ref={ref} className="nu-seg">
       <svg width={width} height={SEG_H} viewBox={`0 0 ${width} ${SEG_H}`} aria-hidden="true">
@@ -156,10 +179,9 @@ export function SegBar({ segs, selected, onSelect, label, describe }: { segs: Se
         })}
       </svg>
       <div className="nu-seg__hits" role="group" aria-label={label}>
-        {hits.map(({ s, x, w }) => {
-          const hw = Math.max(w, 24)
-          return <button key={s.key} type="button" className="nu-seg__hit" style={{ left: x + w / 2 - hw / 2, width: hw }} aria-label={describe(s)} aria-pressed={selected === s.key} onClick={() => onSelect(s.key)} />
-        })}
+        {placed.map(({ s }, i) => (
+          <button key={s.key} type="button" className="nu-seg__hit" style={{ left: spans[i].left, width: spans[i].width }} aria-label={describe(s)} aria-pressed={selected === s.key} onClick={() => onSelect(s.key)} />
+        ))}
       </div>
     </div>
   )

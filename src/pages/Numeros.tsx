@@ -10,7 +10,8 @@ import { Cover } from '../components/AlbumCard'
 import { StarRating } from '../components/StarRating'
 import { Columns, HBars, Meter, Readout, SegBar, segFill, type ColDatum } from '../components/NumerosFiguras'
 import { artistStats, copyStats, decadeStats, discos, familyStats, growthStats, heroStats, labelStats, moneyStats, pct, starStats, tagStats, yearsOf, type Bucket, type CondStats, type Extreme } from '../lib/stats'
-import { decadeLabel, priceLabel } from '../lib/text'
+import { cleanArtist, decadeLabel, priceLabel } from '../lib/text'
+import { ariaTextFor } from '../lib/starSlider'
 import type { Album } from '../types'
 import '../styles/numeros.css'
 
@@ -144,16 +145,22 @@ function Notes({ children }: { children: ReactNode }) {
   return <div className="nu-notes">{children}</div>
 }
 
-function More({ n, onClick }: { n: number; onClick: () => void }) {
-  return <button type="button" className="nu-more" onClick={onClick}>y {n} más · <b>Ver todos ›</b></button>
+/** Cola de la figura: "y 49 más · Ver todos ›" (sin `n`, solo "Ver todos ›"). */
+function More({ n, onClick }: { n?: number; onClick: () => void }) {
+  // Un solo span adentro: el botón es inline-flex (para centrar los 44 px) y un texto suelto perdería su espacio final.
+  return <button type="button" className="nu-more" onClick={onClick}><span>{n !== undefined && <>y {n} más · </>}<b>Ver todos ›</b></span></button>
+}
+
+/** "· Ver en la colección ›": separador y enlace van juntos para que el punto no quede colgando al final de la línea. */
+function Go({ to }: { to: string }) {
+  return <span className="nu-readout__go">· <Link to={to}>Ver en la colección ›</Link></span>
 }
 
 /** Fila fija que lleva a la ficha: "El más viejo: Kind of Blue · Miles Davis · 1959 ›". */
 function FixedLine({ k, album, value }: { k: string; album: Album; value: string }) {
   return (
     <Link to={`/album/${album.id}`} className="nu-line">
-      <span className="nu-line__k">{k}</span>
-      <span className="nu-line__v">{value}</span>
+      <span className="nu-line__body"><span className="nu-line__k">{k}</span><span className="nu-line__v">{value}</span></span>
       <ChevronIcon className="nu-line__chev" width={18} height={18} />
     </Link>
   )
@@ -202,8 +209,9 @@ function Hero({ albums }: { albums: Album[] }) {
     <section className="nu-hero" aria-label="Tu colección en cifras">
       <span className="eyebrow nu-hero__eyebrow">Tu colección</span>
       <div className="nu-hero__fig">
-        <span className="nu-hero__n"><span className="nu-hero__ghost" aria-hidden="true">{h.n}</span><span>{shown}</span></span>
-        <span className="nu-hero__unit">{h.n === 1 ? 'disco' : 'discos'}</span>
+        <span className="visually-hidden">{discos(h.n)}</span>
+        <span className="nu-hero__n" aria-hidden="true"><span className="nu-hero__ghost">{h.n}</span><span>{shown}</span></span>
+        <span className="nu-hero__unit" aria-hidden="true">{h.n === 1 ? 'disco' : 'discos'}</span>
       </div>
       <div className="nu-tiles">
         <div className="nu-tile" style={{ '--i': 0 } as CSSProperties}><span className="nu-tile__k">Horas de música</span><span className="nu-tile__v">{h.hours}</span></div>
@@ -230,8 +238,8 @@ function Artistas({ albums }: { albums: Album[] }) {
       {s.chart && (
         <>
           <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-          <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% de tu colección · <Link to={q(cur.label)}>Ver en la colección ›</Link></>}</Readout>
           {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
+          <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% de tu colección <Go to={q(cur.label)} /></>}</Readout>
         </>
       )}
       {s.various > 0 && <Notes><span className="nu-note">{s.various} de varios artistas no {s.various === 1 ? 'cuenta' : 'cuentan'} aquí</span></Notes>}
@@ -244,7 +252,7 @@ function Artistas({ albums }: { albums: Album[] }) {
 
 function extremeText(e: Extreme): string {
   const a = e.album
-  return `${a.title} · ${a.artist} · ${a.year}${e.more > 0 ? ` · y ${e.more} más de ese año` : ''}`
+  return `${a.title} · ${cleanArtist(a.artist)} · ${a.year}${e.more > 0 ? ` · y ${e.more} más de ese año` : ''}`
 }
 
 function Anos({ albums }: { albums: Album[] }) {
@@ -263,9 +271,9 @@ function Anos({ albums }: { albums: Album[] }) {
   return (
     <Card id="nu-a2" eyebrow="A2 · De qué año son">
       <Lead>{s.lead}</Lead>
-      {s.chart && (
+      {(s.chart || s.chartYears) && (
         <>
-          <Columns cols={decCols} selected={dec} onSelect={(k) => { setYear(null); setDec((p) => (p === k ? null : k)) }} label="Discos por década" />
+          {s.chart && <Columns cols={decCols} selected={dec} onSelect={(k) => { setYear(null); setDec((p) => (p === k ? null : k)) }} label="Discos por década" />}
           {decade !== null && (
             <div key={decade} className="nu-xfade nu-years">
               <span className="nu-years__k">Por año · {decadeLabel(decade)}</span>
@@ -274,8 +282,8 @@ function Anos({ albums }: { albums: Album[] }) {
           )}
           <Readout>
             {curYear
-              ? <><b>{discos(curYear.count)}</b> · {curYear.value} · <Link to={q(String(curYear.value))}>Ver en la colección ›</Link></>
-              : curDec && <><b>{discos(curDec.count)}</b> · {decadeLabel(curDec.value)} · {pct(curDec.count, albums.length)}% · <Link to={`/?decada=${curDec.value}`}>Ver en la colección ›</Link></>}
+              ? <><b>{discos(curYear.count)}</b> · {curYear.value} <Go to={q(String(curYear.value))} /></>
+              : s.chart && curDec && <><b>{discos(curDec.count)}</b> · {decadeLabel(curDec.value)} · {pct(curDec.count, albums.length)}% <Go to={`/?decada=${curDec.value}`} /></>}
           </Readout>
         </>
       )}
@@ -285,7 +293,7 @@ function Anos({ albums }: { albums: Album[] }) {
           <FixedLine k="El más nuevo" album={s.newest.album} value={extremeText(s.newest)} />
         </div>
       )}
-      {s.without > 0 && <Notes><span className="nu-note">{s.without === 1 ? '1 disco sin año no entra aquí' : `${s.without} discos sin año no entran aquí`}</span></Notes>}
+      {s.without > 0 && s.decades.length > 0 && <Notes><span className="nu-note">{s.without === 1 ? '1 disco sin año no entra aquí' : `${s.without} discos sin año no entran aquí`}</span></Notes>}
     </Card>
   )
 }
@@ -295,10 +303,11 @@ function Anos({ albums }: { albums: Album[] }) {
 function Generos({ albums }: { albums: Album[] }) {
   const g = useMemo(() => tagStats(albums, 'genres'), [albums])
   const st = useMemo(() => tagStats(albums, 'styles'), [albums])
-  const [view, setView] = useState<'genres' | 'styles'>('genres')
+  // Arranca en la vista que tenga filas; los chips existen en cuanto algún disco trae estilos.
+  const [view, setView] = useState<'genres' | 'styles'>(g.rows.length > 0 || st.rows.length === 0 ? 'genres' : 'styles')
   const [sel, setSel] = useState<string | null>(null)
   const [all, setAll] = useState(false)
-  const chips = g.rows.length > 0 && st.rows.length > 0
+  const chips = st.rows.length > 0
   const s = view === 'genres' ? g : st
   const limit = view === 'genres' ? 6 : 8
   const shown = s.rows.slice(0, limit)
@@ -315,11 +324,11 @@ function Generos({ albums }: { albums: Album[] }) {
         {s.chart && (
           <>
             <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-            <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% de tu colección · <Link to={href(cur)}>Ver en la colección ›</Link></>}</Readout>
             {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
+            <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% de tu colección <Go to={href(cur)} /></>}</Readout>
           </>
         )}
-        {g.rows.length > 0 && (
+        {s.rows.length > 0 && (
           <Notes>
             <span className="nu-note">Un disco puede traer varios {word}s</span>
             {s.without > 0 && <span className="nu-note">{s.without} sin {word} · <Link to="/ajustes">Conecta Discogs en Ajustes ›</Link></span>}
@@ -354,7 +363,7 @@ function Estrellas({ albums }: { albums: Album[] }) {
           <span className="eyebrow">Tus mejores</span>
           <div className="nu-best">
             {s.best.map((a) => (
-              <Link key={a.id} to={`/album/${a.id}`} className="nu-best__item" aria-label={`${a.title}, ${a.artist}`}>
+              <Link key={a.id} to={`/album/${a.id}`} className="nu-best__item" aria-label={`${a.title}, ${cleanArtist(a.artist)}, ${ariaTextFor(a.rating)}`}>
                 <Cover src={a.thumbUrl ?? a.coverUrl} title={a.title} className="thumb nu-best__cover" />
                 <StarRating value={a.rating} size={12} />
               </Link>
@@ -383,8 +392,8 @@ function Sellos({ albums }: { albums: Album[] }) {
       {s.chart && (
         <>
           <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-          <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% · <Link to={q(cur.label)}>Ver en la colección ›</Link></>}</Readout>
           {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
+          <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% <Go to={q(cur.label)} /></>}</Readout>
         </>
       )}
       {s.without > 0 && s.rows.length > 0 && <Notes><span className="nu-note">{s.without} sin sello</span></Notes>}
@@ -403,7 +412,7 @@ function Crecimiento({ albums }: { albums: Album[] }) {
   return (
     <Card id="nu-b1" eyebrow="B1 · Cómo ha crecido">
       <Lead>{s.lead}</Lead>
-      <span className="nu-sub">{s.sub}</span>
+      {s.sub && <span className="nu-sub">{s.sub}</span>}
       {s.chart && (
         <>
           <Columns cols={cols} selected={sel} onSelect={toggle(setSel)} label="Discos agregados por mes, últimos doce meses" />
@@ -418,21 +427,28 @@ function Crecimiento({ albums }: { albums: Album[] }) {
 
 function Condicion({ c, total, view }: { c: CondStats; total: number; view: string }) {
   const [sel, setSel] = useState<string | null>(null)
+  const [all, setAll] = useState(false)
   const segs = c.blocks.map((b) => ({ key: b.key, label: b.label, count: b.count, step: b.step, text: b.step > 0 ? `${pct(b.count, total)}%` : '' }))
   const cur = sel ? c.blocks.find((b) => b.key === sel) : undefined
   const visible = c.blocks.filter((b) => b.count > 0)
+  const title = `Estado ${view === 'media' ? 'del disco' : 'de la funda'}`
+  // La hoja es la vista-tabla de la barra: los bloques con estado, de M a G+ o menos, y "Sin dato" al final.
+  const rows: Bucket[] = visible.filter((b) => b.step > 0).map((b) => ({ key: b.key, label: b.label, count: b.count }))
+  const nd = c.blocks.find((b) => b.step === 0)
   return (
     <div key={view} className="nu-xfade nu-card__body">
       <Lead>{c.lead}</Lead>
       {c.enough && (
         <>
-          <SegBar segs={segs} selected={sel} onSelect={toggle(setSel)} label={`Estado ${view === 'media' ? 'del disco' : 'de la funda'}`} describe={(s) => (s.step > 0 ? `${s.label}, ${discos(s.count)}, ${pct(s.count, c.withData)}% de los que tienen estado` : `Sin dato, ${discos(s.count)}`)} />
+          <SegBar segs={segs} selected={sel} onSelect={toggle(setSel)} label={title} describe={(s) => (s.step > 0 ? `${s.label}, ${discos(s.count)}, ${pct(s.count, c.withData)}% de los que tienen estado` : `Sin dato, ${discos(s.count)}`)} />
           <ul className="nu-legend">
             {visible.map((b) => <li key={b.key}><i style={{ background: segFill(b.step) }} />{b.label}</li>)}
           </ul>
+          <More onClick={() => setAll(true)} />
           <Readout>{cur && (cur.step > 0 ? <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, c.withData)}% de los que tienen estado</> : <><b>{discos(cur.count)}</b> · sin dato</>)}</Readout>
         </>
       )}
+      {all && <AllSheet title={title} sub={`${c.withData} con estado · ${discos(total)}`} rows={rows} total={c.withData} foot={nd && nd.count > 0 ? { label: 'Sin dato', count: nd.count } : undefined} onClose={() => setAll(false)} />}
     </div>
   )
 }
@@ -442,7 +458,7 @@ function Copias({ albums }: { albums: Album[] }) {
   const [view, setView] = useState<'media' | 'sleeve'>('media')
   const c = view === 'media' ? s.media : s.sleeve
   return (
-    <Card id="nu-b2" eyebrow="B2 · Tus copias" aside={s.anySleeve && <Chips value={view} options={[{ value: 'media', label: 'Disco' }, { value: 'sleeve', label: 'Funda' }]} onChange={setView} label="Condición de" />}>
+    <Card id="nu-b2" eyebrow="B2 · Tus copias" aside={s.anySleeve && (s.media.enough || s.sleeve.enough) && <Chips value={view} options={[{ value: 'media', label: 'Disco' }, { value: 'sleeve', label: 'Funda' }]} onChange={setView} label="Condición de" />}>
       <Condicion key={view} c={c} total={albums.length} view={view} />
       <div className="nu-kvs">
         <div className="nu-kv"><span className="nu-kv__k">Formato</span><span className="nu-kv__v">{s.formatLine}</span></div>
@@ -467,15 +483,15 @@ function Invertido({ albums }: { albums: Album[] }) {
       <Lead>{s.lead}</Lead>
       {s.priced > 0 && (
         <>
-          {s.top && s.top.purchasePrice !== undefined && <div className="nu-lines"><FixedLine k="El más caro" album={s.top} value={`${s.top.title} · ${s.top.artist} · ${priceLabel(s.top.purchasePrice)}`} /></div>}
+          {s.top && s.top.purchasePrice !== undefined && <div className="nu-lines"><FixedLine k="El más caro" album={s.top} value={`${s.top.title} · ${cleanArtist(s.top.artist)} · ${priceLabel(s.top.purchasePrice)}`} /></div>}
           {s.places.length > 0 && (
             <div className="stack" style={{ gap: 8 }}>
               <span className="eyebrow">Dónde compras</span>
               {s.placesChart ? (
                 <>
                   <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-                  <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label}</>}</Readout>
                   {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
+                  <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label}</>}</Readout>
                 </>
               ) : (
                 <span className="nu-line15">{s.places.map((p) => `${p.label} ${p.count}`).join(' · ')}</span>
@@ -485,7 +501,7 @@ function Invertido({ albums }: { albums: Album[] }) {
           {s.withoutPrice > 0 && <Notes><span className="nu-note">{s.withoutPrice} sin precio</span></Notes>}
         </>
       )}
-      {all && <AllSheet title="Dónde compras" sub={`${s.places.length} lugares · ${discos(withPlace)}`} rows={s.places} total={albums.length} foot={albums.length - withPlace > 0 ? { label: 'Sin lugar', count: albums.length - withPlace } : undefined} onClose={() => setAll(false)} />}
+      {all && <AllSheet title="Dónde compras" sub={`${s.places.length} lugares · ${discos(albums.length)}`} rows={s.places} total={albums.length} foot={albums.length - withPlace > 0 ? { label: 'Sin lugar', count: albums.length - withPlace } : undefined} onClose={() => setAll(false)} />}
     </Card>
   )
 }

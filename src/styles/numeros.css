@@ -5,8 +5,10 @@
  */
 
 /* Tokens de las figuras. La rampa ordinal (solo la condición, B2) es un solo tono, el de --accent;
-   el oscuro recorre sus propios pasos desde el otro lado. --viz-on-N es el texto dentro de cada
-   bloque de la barra alta: `transparent` donde el par no llega a APCA 60. */
+   el oscuro recorre sus propios pasos desde el otro lado (los dos de arriba van más claros que
+   --accent para que NM y M lleven cifra: #50c4ca → #0e1a1b Lc 62, #64d8de → #0e1a1b Lc 72).
+   --viz-on-N es el texto dentro de cada bloque de la barra alta: `transparent` donde el par no
+   llega a APCA 60. */
 :root {
   --viz-bar: var(--accent);
   --viz-dim: #3fb2b8;
@@ -29,12 +31,12 @@
   --viz-1: #0f6b70;
   --viz-2: #188489;
   --viz-3: #2a9da3;
-  --viz-4: #3fb2b8;
-  --viz-5: #5dcbd1;
+  --viz-4: #50c4ca;
+  --viz-5: #64d8de;
   --viz-on-1: #ffffff;
   --viz-on-2: #ffffff;
   --viz-on-3: #ffffff;
-  --viz-on-4: transparent;
+  --viz-on-4: #0e1a1b;
   --viz-on-5: #0e1a1b;
 }
 
@@ -52,7 +54,8 @@
 .nu-notes { display: flex; flex-direction: column; gap: 4px; }
 .nu-note { font-size: 13px; color: var(--text-2); line-height: 1.4; }
 .nu-note a { font-weight: 600; }
-.nu-more { align-self: flex-start; margin: -4px 0 0; padding: 8px 0; border: 0; background: transparent; color: var(--text-2); font: inherit; font-size: 13px; line-height: 1.2; text-align: left; }
+/* Mide 44 px de alto (blanco táctil) pero ocupa 32: el sobrante se compensa con margen negativo. */
+.nu-more { align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; margin: -6px 0; padding: 0; border: 0; background: transparent; color: var(--text-2); font: inherit; font-size: 13px; line-height: 1.2; text-align: left; }
 .nu-more b { color: var(--accent); font-weight: 600; }
 
 /* Divisor "Lado A · La música" */
@@ -60,11 +63,14 @@
 .nu-lado .eyebrow { white-space: nowrap; }
 .nu-lado__line { flex: 1; height: 1px; background: var(--line); }
 
-/* Filas fijas que llevan a la ficha (el más viejo, el más nuevo, el más caro) */
+/* Filas fijas que llevan a la ficha (el más viejo, el más nuevo, el más caro): etiqueta arriba y
+   valor abajo a la izquierda (como los pares de B2), para que "Título · Artista · Año" no se parta
+   en bandera derecha junto a una etiqueta de 11 px. */
 .nu-lines { display: flex; flex-direction: column; }
 .nu-line { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 0; color: var(--text); border-radius: var(--radius); }
-.nu-line__k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); flex: none; white-space: nowrap; }
-.nu-line__v { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; text-align: right; line-height: 1.35; overflow-wrap: anywhere; }
+.nu-line__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nu-line__k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+.nu-line__v { font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .nu-line__chev { flex: none; color: var(--text-2); margin-right: -4px; }
 
 /* Pares "FORMATO · 69 LP · 21 dobles…" */
@@ -82,16 +88,18 @@
 .nu-hero__ghost { visibility: hidden; }
 .nu-hero__unit { font-weight: 600; font-size: 18px; }
 .nu-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.nu-tile { display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; min-width: 0; padding: 10px; border: 0; border-radius: var(--radius); background: rgba(244, 242, 237, 0.10); color: inherit; text-align: left; font: inherit; }
+/* Etiqueta arriba y valor pegado abajo: los tres valores quedan alineados aunque una etiqueta ocupe dos líneas. */
+.nu-tile { display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; min-width: 0; padding: 10px; border: 0; border-radius: var(--radius); background: rgba(244, 242, 237, 0.10); color: inherit; text-align: left; font: inherit; }
 .nu-tile--btn { cursor: pointer; }
 .nu-tile--btn:active { background: rgba(244, 242, 237, 0.18); }
-.nu-tile__k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.3; color: color-mix(in srgb, var(--on-brand) 85%, transparent); min-height: 2.6em; display: flex; align-items: flex-end; }
-.nu-tile__v { font-family: var(--body); font-weight: 700; font-size: 24px; line-height: 1.1; letter-spacing: -0.01em; }
+.nu-tile__k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.3; color: color-mix(in srgb, var(--on-brand) 85%, transparent); }
+.nu-tile__v { margin-top: auto; font-family: var(--body); font-weight: 700; font-size: 24px; line-height: 1.1; letter-spacing: -0.01em; }
 .nu-hero__note { margin: -2px 0 0; font-size: 13px; color: color-mix(in srgb, var(--on-brand) 85%, transparent); }
 
 /* ---------- Barras horizontales ---------- */
-/* Cada fila mide 28 px pero toca 44: el relleno vertical extra se compensa con margen negativo. */
-.nu-bars { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+/* Cada fila mide 28 px pero toca 44: el relleno vertical extra se compensa con margen negativo.
+   El hueco de 16 px deja el paso en 44, así ningún blanco táctil se encima con el de la fila de abajo. */
+.nu-bars { display: flex; flex-direction: column; gap: 16px; padding: 8px 0; }
 .nu-bar { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; height: 28px; box-sizing: content-box; padding: 8px 0; margin: -8px 0; border: 0; border-radius: var(--radius); background: transparent; color: var(--text); text-align: left; font: inherit; }
 .nu-bar__name { font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .nu-bar__rail { display: flex; align-items: center; min-width: 0; height: 28px; }
@@ -104,6 +112,7 @@
 .nu-cols svg { display: block; width: 100%; height: 160px; overflow: visible; }
 .nu-cols__hits { position: absolute; inset: 0; display: flex; }
 .nu-col__hit { flex: 1 1 0; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; background: transparent; border-radius: var(--radius); cursor: pointer; }
+.nu-col__hit:disabled { cursor: default; }
 .nu-base { stroke: var(--viz-grid); stroke-width: 1; }
 .nu-col__mark { fill: var(--viz-bar); transform-box: fill-box; transform-origin: 50% 100%; }
 .nu-col__mark--dim { fill: var(--viz-dim); }
@@ -118,7 +127,9 @@
 .nu-seg__hits { position: absolute; inset: 0; }
 .nu-seg__hit { position: absolute; top: 0; height: 28px; margin: 0; padding: 0; border: 0; background: transparent; border-radius: 4px; cursor: pointer; }
 .nu-seg__block { transform-box: fill-box; transform-origin: 0 50%; }
-.nu-seg__part--dim { opacity: 0.4; }
+/* Hermanas del bloque tocado: solo el relleno baja a 0.4; su cifra se esconde (el readout da el tocado y la hoja el resto). */
+.nu-seg__part--dim .nu-seg__block { opacity: 0.4; }
+.nu-seg__part--dim .nu-seg__text { fill: transparent; }
 .nu-seg__text { font-family: var(--mono); font-size: 12px; font-weight: 600; pointer-events: none; }
 .nu-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
 .nu-legend li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
@@ -133,7 +144,8 @@
 /* ---------- Readout ---------- */
 .nu-readout { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.5; letter-spacing: 0.01em; color: var(--text-2); }
 .nu-readout b { color: var(--text); font-weight: 600; }
-.nu-readout a { font-weight: 600; white-space: nowrap; }
+.nu-readout a { font-weight: 600; }
+.nu-readout__go { white-space: nowrap; }
 /* Sin selección no ocupa espacio, pero sigue en el árbol como región viva. */
 .nu-readout--off { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
@@ -168,9 +180,9 @@ button.nu-trow:active { background: var(--card-2); }
   /* Al entrar: crecen desde su base, escalonadas; las cifras aparecen a los 240 ms. */
   .nu-bar__fill, .nu-meter__fill { transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms), background-color 120ms; }
   .nu-col__mark { transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms), fill 120ms; }
-  .nu-seg__block { transition: transform var(--dur, 420ms) cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms), fill 120ms; }
-  .nu-seg__part { transition: opacity 120ms; }
-  .nu-bar__val, .nu-col__cap, .nu-seg__text { transition: opacity 150ms 240ms; }
+  .nu-seg__block { transition: transform var(--dur, 420ms) cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms), fill 120ms, opacity 120ms; }
+  .nu-bar__val, .nu-col__cap { transition: opacity 150ms 240ms; }
+  .nu-seg__text { transition: opacity 150ms 240ms, fill 120ms; }
   .nu-tile { animation: nu-rise 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
   .nu-xfade, .nu-readout:not(.nu-readout--off) { animation: nu-fade 150ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   .nu-tile--btn, .nu-trow, .nu-line { transition: background-color 120ms ease; }

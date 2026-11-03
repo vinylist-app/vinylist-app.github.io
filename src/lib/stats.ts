@@ -109,10 +109,10 @@ export interface HeroStats {
   note?: string
 }
 
-/** "4:54" → 294 s; "1:02:30" → 3750 s; lo que no se entiende, undefined. */
+/** "4:54" → 294 s; "1:02:30" → 3750 s; lo que no se entiende (o trae segundos ≥ 60), undefined. */
 export function parseDuration(s?: string): number | undefined {
   if (!s) return undefined
-  const m = /^(\d+):(\d{1,2})(?::(\d{1,2}))?$/.exec(s.trim())
+  const m = /^(\d+):([0-5]?\d)(?::([0-5]?\d))?$/.exec(s.trim())
   if (!m) return undefined
   const [, a, b, c] = m
   return c === undefined ? Number(a) * 60 + Number(b) : Number(a) * 3600 + Number(b) * 60 + Number(c)
@@ -126,8 +126,9 @@ export function heroStats(albums: Album[]): HeroStats {
     songs += a.tracklist.length
     let any = false
     for (const t of a.tracklist) {
+      // "0:00" (pasa con algunos lanzamientos de Discogs) no es una duración.
       const d = parseDuration(t.duration)
-      if (d !== undefined) { seconds += d; any = true }
+      if (d) { seconds += d; any = true }
     }
     if (any) withDurations++
   }
@@ -165,7 +166,8 @@ export function artistStats(albums: Album[]): ArtistStats {
   const chart = hasChart(rows)
   let lead: string
   if (rows.length === 0) lead = various > 0 ? 'Tus discos son recopilaciones de varios artistas.' : ''
-  else if (own.length === 1) lead = `Tu único disco es de ${rows[0].label}.`
+  else if (albums.length === 1) lead = `Tu único disco es de ${rows[0].label}.`
+  else if (own.length === 1) lead = `Tu único disco con artista es de ${rows[0].label}.`
   else {
     const c = rows[0].count
     const tied = rows.filter((r) => r.count === c)
@@ -200,7 +202,10 @@ export interface DecadeStats {
   top?: number
   without: number
   lead: string
+  /** Columnas por década (≥ 2 décadas con dato y máximo ≥ 2). */
   chart: boolean
+  /** Columnas por año de `top` aunque no haya columnas de décadas (toda la colección en una sola). */
+  chartYears: boolean
   oldest?: Extreme
   newest?: Extreme
 }
@@ -210,36 +215,40 @@ export function tick2(n: number): string {
   return String(n % 100).padStart(2, '0')
 }
 
-function extremeOf(withYear: Album[], year: number): Extreme {
+type WithYear = Album & { year: number }
+const hasYear = (a: Album): a is WithYear => typeof a.year === 'number' && Number.isFinite(a.year) && a.year > 0
+
+function extremeOf(withYear: WithYear[], year: number): Extreme {
   const same = withYear.filter((a) => a.year === year).sort((a, b) => a.addedAt.localeCompare(b.addedAt))
   return { album: same[0], more: same.length - 1 }
 }
 
 export function decadeStats(albums: Album[], now = new Date()): DecadeStats {
-  const withYear = albums.filter((a) => typeof a.year === 'number' && Number.isFinite(a.year) && a.year > 0)
+  const withYear = albums.filter(hasYear)
   const without = albums.length - withYear.length
-  if (withYear.length === 0) return { decades: [], without, lead: 'Tus discos todavía no traen año.', chart: false }
-  const years = withYear.map((a) => a.year as number)
+  if (withYear.length === 0) return { decades: [], without, lead: 'Tus discos todavía no traen año.', chart: false, chartYears: false }
+  const years = withYear.map((a) => a.year)
   const minY = Math.min(...years)
   const maxY = Math.max(...years)
   const counts = new Map<number, number>()
   for (const y of years) {
-    const d = decadeOf(y) as number
+    const d = decadeOf(y)
     counts.set(d, (counts.get(d) ?? 0) + 1)
   }
   const decades: YearCol[] = []
-  for (let d = decadeOf(minY) as number; d <= (decadeOf(maxY) as number); d += 10) decades.push({ value: d, tick: tick2(d), count: counts.get(d) ?? 0 })
+  for (let d = decadeOf(minY); d <= decadeOf(maxY); d += 10) decades.push({ value: d, tick: tick2(d), count: counts.get(d) ?? 0 })
   const chart = hasChart(decades)
   const oldest = extremeOf(withYear, minY)
   const newest = extremeOf(withYear, maxY)
   const c = Math.max(...decades.map((d) => d.count))
   const tied = decades.filter((d) => d.count === c).map((d) => d.value)
   const top = tied[tied.length - 1]
+  const chartYears = hasChart(yearsOf(albums, top))
 
   let lead: string
-  if (!chart) {
-    if (minY === maxY) lead = withYear.length === 1 ? `Tu disco es de ${minY}.` : `Tus discos son de ${minY}.`
-    else lead = `Tus discos van de ${minY} a ${maxY}.`
+  if (c < 2) {
+    // Nadie repite década: no hay década fuerte, solo el rango (un disco con año → su año).
+    lead = minY === maxY ? `Tu disco es de ${minY}.` : `Tus discos van de ${minY} a ${maxY}.`
   } else if (tied.length >= 2) {
     const names = tied.map((d, i) => (i === 0 ? decadeLabel(d) : decadeLabel(d).replace('años ', '')))
     lead = `Los ${tieNames(names)} empatan: ${c} discos cada una.`
@@ -254,7 +263,7 @@ export function decadeStats(albums: Album[], now = new Date()): DecadeStats {
     else if (remate !== '.') lead = `Tu década más fuerte son los ${decadeLabel(D)}, con ${c} discos${remate}`
     else lead = `Tu década más fuerte: los ${decadeLabel(D)}, con ${c} discos.`
   }
-  return { decades, top, without, lead, chart, oldest, newest }
+  return { decades, top, without, lead, chart, chartYears, oldest, newest }
 }
 
 /** Los diez años de una década (d…d+9); los que van en 0 conservan su columna vacía. */
@@ -332,12 +341,12 @@ export function starsLabel(rating: number): string {
 }
 
 export function starStats(albums: Album[]): StarStats {
-  const rated = albums.filter((a) => typeof a.rating === 'number' && a.rating >= 1 && a.rating <= 10)
+  const rated = albums.filter((a): a is Album & { rating: number } => typeof a.rating === 'number' && a.rating >= 1 && a.rating <= 10)
   const hist: StarCol[] = []
   for (let r = 1; r <= 10; r++) hist.push({ rating: r, tick: r % 2 === 0 ? String(r / 2) : '', count: 0, label: starsLabel(r) })
-  for (const a of rated) hist[Math.round(a.rating as number) - 1].count++
+  for (const a of rated) hist[Math.round(a.rating) - 1].count++
   const avg = rated.length ? Math.round((rated.reduce((s, a) => s + toStars(a.rating), 0) / rated.length) * 10) / 10 : 0
-  const sorted = [...rated].sort((a, b) => (b.rating as number) - (a.rating as number) || (b.ratedAt ?? '').localeCompare(a.ratedAt ?? ''))
+  const sorted = [...rated].sort((a, b) => b.rating - a.rating || (b.ratedAt ?? '').localeCompare(a.ratedAt ?? ''))
   const best = sorted.slice(0, 3)
   const max = sorted[0]?.rating ?? 0
   const moreBest = sorted.filter((a) => a.rating === max).length - best.filter((a) => a.rating === max).length
@@ -427,7 +436,7 @@ export function growthStats(albums: Album[], now = new Date()): GrowthStats {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     months.push({ key: monthKey(d), tick: monthShort(d), label: monthLong(d), count: 0 })
   }
-  if (dates.length === 0) return { months, lead: '', sub: '', chart: false, backup: false }
+  if (dates.length === 0) return { months, lead: 'Tus discos no traen fecha de alta.', sub: '', chart: false, backup: false }
 
   const byMonth = new Map<string, { count: number; date: Date }>()
   const byDay = new Map<string, number>()
@@ -447,12 +456,14 @@ export function growthStats(albums: Album[], now = new Date()): GrowthStats {
   const topDay = [...byDay.entries()].sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]))[0]
   const backup = dates.length >= 10 && topDay[1] / dates.length >= 0.8
   const topMonth = [...byMonth.entries()].sort((a, b) => b[1].count - a[1].count || b[0].localeCompare(a[0]))[0]
+  // La gráfica solo enseña los últimos doce meses: si el mes más intenso quedó antes, el lead lo dice.
+  const inWindow = months.some((m) => m.key === topMonth[0])
   let lead: string
   if (backup) {
     const when = purchaseDateLabel(topDay[0], now)
     lead = `${topDay[1]} discos entraron de golpe ${when === 'Hoy' ? 'hoy' : `el ${when}`}: un respaldo.`
   } else if (byMonth.size === 1) lead = `Todo lo agregaste en ${monthLong(topMonth[1].date)}.`
-  else lead = `Tu mes más intenso: ${monthLong(topMonth[1].date)}, con ${discos(topMonth[1].count)}.`
+  else lead = `Tu mes más intenso: ${monthLong(topMonth[1].date)}, con ${discos(topMonth[1].count)}${inWindow ? '' : ' (antes de estos doce meses)'}.`
   const since = purchaseDateLabel(first.toISOString(), now)
   const sub = `Este año llevas ${yearCount} · ${since === 'Hoy' ? 'desde hoy' : `desde el ${since}`}`
   return { months, lead, sub, chart: hasChart(months), backup }
@@ -486,7 +497,8 @@ export interface CopyStats {
   anySleeve: boolean
 }
 
-const FORMAT_ES: Record<string, string> = { lp: 'LP', '2xlp': 'dobles', '7"': 'sencillos de 7"' }
+/** [singular, plural]: "1 doble", "21 dobles". */
+const FORMAT_ES: Record<string, [string, string]> = { lp: ['LP', 'LP'], '2xlp': ['doble', 'dobles'], '7"': ['sencillo de 7"', 'sencillos de 7"'] }
 const COUNTRY_ES: Record<string, string> = { mexico: 'México', germany: 'Alemania', spain: 'España', japan: 'Japón', brazil: 'Brasil', italy: 'Italia', france: 'Francia', netherlands: 'Países Bajos' }
 const COND_STEP: Record<Condition, 1 | 2 | 3 | 4 | 5> = { M: 5, NM: 4, 'VG+': 3, VG: 2, 'G+': 1, G: 1, F: 1, P: 1 }
 const COND_LABEL: Record<number, string> = { 5: 'M', 4: 'NM', 3: 'VG+', 2: 'VG', 1: 'G+ o menos', 0: 'sin dato' }
@@ -514,7 +526,7 @@ export function conditionStats(albums: Album[], field: 'mediaCondition' | 'sleev
 
 export function copyStats(albums: Album[]): CopyStats {
   const fmt = tally(albums, (a) => [a.format])
-  const parts = fmt.rows.map((r) => `${r.count} ${FORMAT_ES[r.key] ?? r.label}`)
+  const parts = fmt.rows.map((r) => { const es = FORMAT_ES[r.key]; return `${r.count} ${es ? es[r.count === 1 ? 0 : 1] : r.label}` })
   if (fmt.without > 0) parts.push(`${fmt.without} sin formato`)
   const countries = tally(albums, (a) => [a.country])
   const cParts = countries.rows.slice(0, 3).map((r) => `${COUNTRY_ES[r.key] ?? r.label} ${r.count}`)
@@ -542,14 +554,14 @@ export interface MoneyStats {
 }
 
 export function moneyStats(albums: Album[]): MoneyStats {
-  const priced = albums.filter((a) => typeof a.purchasePrice === 'number' && Number.isFinite(a.purchasePrice))
-  const total = priced.reduce((s, a) => s + (a.purchasePrice as number), 0)
+  const priced = albums.filter((a): a is Album & { purchasePrice: number } => typeof a.purchasePrice === 'number' && Number.isFinite(a.purchasePrice))
+  const total = priced.reduce((s, a) => s + a.purchasePrice, 0)
   const withoutPrice = albums.length - priced.length
   let lead: string
   if (priced.length === 0) lead = 'Ponle precio a tus discos y te digo cuánto llevas.'
   else if (priced.length === 1) lead = `Llevas ${priceLabel(total)} en 1 disco.`
   else lead = `Llevas ${priceLabel(total)} en ${priced.length} discos: ${priceLabel(Math.round(total / priced.length))} cada uno.`
-  const top = [...priced].sort((a, b) => (b.purchasePrice as number) - (a.purchasePrice as number) || b.addedAt.localeCompare(a.addedAt))[0]
+  const top = [...priced].sort((a, b) => b.purchasePrice - a.purchasePrice || b.addedAt.localeCompare(a.addedAt))[0]
   const { rows: places } = tally(albums, (a) => [a.purchasePlace])
   return { priced: priced.length, total, lead, top, places, placesChart: hasChart(places), withoutPrice }
 }

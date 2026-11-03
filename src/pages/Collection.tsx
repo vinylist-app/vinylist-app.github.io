@@ -5,6 +5,7 @@ import { applyFilters, collectDecades, collectGenres, filtersFromParams, type Fi
 import { AlbumCard } from '../components/AlbumCard'
 import { BarsIcon, SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
+import { decadeLabel } from '../lib/text'
 
 const SORTS: { value: Filters['sort']; label: string }[] = [
   { value: 'recent', label: 'Recientes' },
@@ -30,7 +31,7 @@ export function Collection() {
   const filtrado = conChips || f.query.trim() !== ''
   const resumen = [
     f.genre,
-    f.decade !== undefined && `años ${String(f.decade).slice(2)}`,
+    f.decade !== undefined && decadeLabel(f.decade),
     f.minRating !== undefined && '4.5+ estrellas',
     f.sort !== 'recent' && `ordenado por ${SORTS.find((s) => s.value === f.sort)?.label ?? ''}`,
   ].filter(Boolean).join(' · ')
@@ -65,7 +66,7 @@ export function Collection() {
               <button key={g} className={`chip ${f.genre === g ? 'chip--on' : ''}`} onClick={() => setF({ ...f, genre: f.genre === g ? undefined : g })}>{g}</button>
             ))}
             {decades.map((d) => (
-              <button key={d} className={`chip ${f.decade === d ? 'chip--on' : ''}`} onClick={() => setF({ ...f, decade: f.decade === d ? undefined : d })}>Años {String(d).slice(2)}</button>
+              <button key={d} className={`chip ${f.decade === d ? 'chip--on' : ''}`} onClick={() => setF({ ...f, decade: f.decade === d ? undefined : d })}>{decadeLabel(d).replace('años', 'Años')}</button>
             ))}
             <button className={`chip ${f.minRating === 9 ? 'chip--on' : ''}`} onClick={() => setF({ ...f, minRating: f.minRating === 9 ? undefined : 9 })}>4.5+ estrellas</button>
             <select className={`chip chip--select ${f.sort !== 'recent' ? 'chip--on' : ''}`} aria-label="Ordenar" value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value as Filters['sort'] })}>
