@@ -9,7 +9,7 @@ import { Sheet } from '../components/Sheet'
 import { Cover } from '../components/AlbumCard'
 import { StarRating } from '../components/StarRating'
 import { Columns, Donut, HBars, Meter, Readout, SegBar, segFill, type ColDatum, type DonutDatum } from '../components/NumerosFiguras'
-import { artistStats, copyStats, decadeStats, discos, donutSlices, familyStats, growthStats, heroStats, labelStats, moneyStats, OTHER_KEY, pct, starStats, tagStats, yearsOf, type Bucket, type CondStats, type DecadeStats, type Extreme } from '../lib/stats'
+import { artistStats, copyStats, decadeStats, discos, donutSlices, familyStats, growthStats, heroStats, labelStats, moneyStats, OTHER_KEY, otrosLabel, pct, starStats, tagStats, yearsOf, type Bucket, type CondStats, type DecadeStats, type Extreme } from '../lib/stats'
 import { getFigura, setFigura, type Figura } from '../lib/figura'
 import { cleanArtist, decadeLabel, priceLabel } from '../lib/text'
 import { ariaTextFor } from '../lib/starSlider'
@@ -89,6 +89,12 @@ export function Numeros() {
   const family = Boolean(collection && Object.keys(collection.members).length >= 2)
   const [figura, setFig] = useState<Figura>(getFigura)
   const changeFigura = (f: Figura) => { setFigura(f); setFig(f) }
+  // El control solo aparece si alguna sección parte-de-un-todo dibuja figura (con 3 discos todo es solo lead y no cambiaría nada).
+  const figurable = useMemo(() => {
+    if (albums.length === 0) return false
+    const c = copyStats(albums)
+    return artistStats(albums).chart || decadeStats(albums).chart || tagStats(albums, 'genres').chart || tagStats(albums, 'styles').chart || labelStats(albums).chart || c.media.enough || c.sleeve.enough || moneyStats(albums).placesChart
+  }, [albums])
 
   return (
     <main className="page nu">
@@ -116,7 +122,7 @@ export function Numeros() {
       ) : (
         <FiguraContext value={figura}>
           <Hero albums={albums} />
-          <Chips className="nu-figura" value={figura} options={[{ value: 'barras', label: 'Barras' }, { value: 'pastel', label: 'Pastel' }]} onChange={changeFigura} label="Tipo de gráfica" />
+          {figurable && <Chips className="nu-figura" value={figura} options={[{ value: 'barras', label: 'Barras' }, { value: 'pastel', label: 'Pastel' }]} onChange={changeFigura} label="Tipo de gráfica" />}
           <Lado label="Lado A · La música" />
           <Artistas albums={albums} />
           <Anos albums={albums} />
@@ -190,18 +196,32 @@ function Chips<T extends string>({ value, options, onChange, label, className = 
   )
 }
 
+interface RepartoProps {
+  rows: Bucket[]
+  limit: number
+  title: string
+  /** Lo que dice el centro de la dona; si no se da, la suma de las filas (lo que el anillo muestra). */
+  total?: number
+  /** Unidad del centro ("discos", "con sello", "con lugar"). */
+  unit?: string
+  /** Singular y plural de la categoría, para «otro sello» / «otros 3 sellos». */
+  word: [string, string]
+  readout: (r: Bucket) => ReactNode
+  onAll?: () => void
+}
+
 /**
  * Parte-de-un-todo (A1, A3, A5, B3): barras ordenadas (top `limit`) o, en modo pastel, la dona
  * (top 5 + Otros) con su leyenda. La cola «y N más · Ver todos ›» y el readout van igual en los
  * dos modos; «Otros» solo dice cuántas categorías pliega. Cambiar de modo remonta la figura
  * (cross-fade) y con ella suelta la selección.
  */
-function Reparto(props: { rows: Bucket[]; limit: number; title: string; total: number; word: string; readout: (r: Bucket) => ReactNode; onAll?: () => void }) {
+function Reparto(props: RepartoProps) {
   const figura = useContext(FiguraContext)
   return <RepartoFig key={figura} pastel={figura === 'pastel'} {...props} />
 }
 
-function RepartoFig({ rows, limit, title, total, word, readout, onAll, pastel }: { rows: Bucket[]; limit: number; title: string; total: number; word: string; readout: (r: Bucket) => ReactNode; onAll?: () => void; pastel: boolean }) {
+function RepartoFig({ rows, limit, title, total, unit = 'discos', word, readout, onAll, pastel }: RepartoProps & { pastel: boolean }) {
   const [sel, setSel] = useState<string | null>(null)
   const shown = rows.slice(0, pastel ? DONUT_TOP : limit)
   const rest = rows.length - shown.length
@@ -211,10 +231,10 @@ function RepartoFig({ rows, limit, title, total, word, readout, onAll, pastel }:
   return (
     <div className="nu-xfade nu-fig">
       {pastel
-        ? <Donut slices={slices} selected={sel} onSelect={toggle(setSel)} label={title} total={total} unit="discos" />
+        ? <Donut slices={slices} selected={sel} onSelect={toggle(setSel)} label={title} total={total ?? rows.reduce((a, r) => a + r.count, 0)} unit={unit} />
         : <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />}
       {rest > 0 && onAll && <More n={rest} onClick={onAll} />}
-      <Readout>{cur ? readout(cur) : other && <><b>{discos(other.count)}</b> · otros {other.rest} {word}</>}</Readout>
+      <Readout>{cur ? readout(cur) : other && <><b>{discos(other.count)}</b> · {otrosLabel(other.rest ?? 0, word[0], word[1])}</>}</Readout>
     </div>
   )
 }
@@ -274,7 +294,7 @@ function Artistas({ albums }: { albums: Album[] }) {
   return (
     <Card id="nu-a1" eyebrow="A1 · Artistas">
       <Lead>{s.lead}</Lead>
-      {s.chart && <Reparto rows={s.rows} limit={8} title="Artistas" total={albums.length} word="artistas" onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={q(r.label)} /></>} />}
+      {s.chart && <Reparto rows={s.rows} limit={8} title="Artistas" word={['artista', 'artistas']} onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={q(r.label)} /></>} />}
       {s.various > 0 && <Notes><span className="nu-note">{s.various} de varios artistas no {s.various === 1 ? 'cuenta' : 'cuentan'} aquí</span></Notes>}
       {all && <AllSheet title="Artistas" sub={`${s.rows.length} artistas · ${discos(albums.length)}`} rows={s.rows} total={albums.length} hrefOf={(r) => q(r.label)} foot={s.various > 0 ? { label: 'Varios artistas', count: s.various } : undefined} onClose={() => setAll(false)} />}
     </Card>
@@ -310,14 +330,18 @@ function Anos({ albums }: { albums: Album[] }) {
  * La figura de A2: columnas por década (o, en pastel, la dona de las 5 décadas mayores + «Otras
  * décadas») y debajo los diez años de la década seleccionada (por defecto la mayor), que siguen
  * siendo columnas en los dos modos. «Otras décadas» se marca y da su readout, pero no cambia la
- * fila de años. Se remonta al cambiar de modo (cross-fade) y vuelve a la década por defecto.
+ * fila de años. La dona no marca la década de arranque (sería una gráfica de una sola rebanada
+ * sin que nadie la tocara): solo marca lo que el usuario toca. Se remonta al cambiar de modo
+ * (cross-fade) y vuelve a la década por defecto.
  */
 function AnosFig({ albums, s, pastel }: { albums: Album[]; s: DecadeStats; pastel: boolean }) {
   const [dec, setDec] = useState<string | null>(s.top !== undefined ? String(s.top) : null)
   const [year, setYear] = useState<string | null>(null)
   /** «Otras décadas» tocada en la dona (la década del drill-down se queda). */
   const [otras, setOtras] = useState(false)
-  useEffect(() => { setDec(s.top !== undefined ? String(s.top) : null); setYear(null); setOtras(false) }, [s.top])
+  /** Si el usuario ya tocó una década: antes, la de arranque muestra sus años pero la dona no la marca. */
+  const [picked, setPicked] = useState(false)
+  useEffect(() => { setDec(s.top !== undefined ? String(s.top) : null); setYear(null); setOtras(false); setPicked(false) }, [s.top])
   const decade = dec !== null ? Number(dec) : null
   const years = useMemo(() => (decade !== null ? yearsOf(albums, decade) : []), [albums, decade])
 
@@ -334,30 +358,33 @@ function AnosFig({ albums, s, pastel }: { albums: Album[]; s: DecadeStats; paste
   const curYear = year !== null ? years.find((y) => String(y.value) === year) : undefined
   const otrasSlice = otras ? decSlices.find((d) => d.key === OTHER_KEY) : undefined
 
-  const pickDec = (k: string) => { setYear(null); setDec((p) => (p === k ? null : k)) }
+  const pickDec = (k: string) => { setYear(null); setPicked(true); setDec((p) => (p === k ? null : k)) }
   const pickSlice = (k: string) => {
     if (k === OTHER_KEY) { setOtras((o) => !o); return }
-    setOtras(false)
+    // Una rebanada que se ve sin marcar (la de arranque, o cualquiera mientras «Otras» está marcada) se selecciona, no se alterna.
+    if (otras || !picked) { setOtras(false); setYear(null); setPicked(true); setDec(k); return }
     pickDec(k)
   }
+  // Tocar un año suelta «Otras décadas»: el readout y el centro pasan a hablar de ese año.
+  const pickYear = (k: string) => { setOtras(false); toggle(setYear)(k) }
 
   return (
     <div className="nu-xfade nu-fig">
       {s.chart && (pastel
-        ? <Donut slices={decSlices} selected={otras ? OTHER_KEY : dec} onSelect={pickSlice} label="Discos por década" total={withYear} unit="con año" />
+        ? <Donut slices={decSlices} selected={otras ? OTHER_KEY : picked ? dec : null} onSelect={pickSlice} label="Discos por década" total={withYear} unit="con año" />
         : <Columns cols={decCols} selected={dec} onSelect={pickDec} label="Discos por década" />)}
       {decade !== null && (
         <div key={decade} className="nu-xfade nu-years">
           <span className="nu-years__k">Por año · {decadeLabel(decade)}</span>
-          <Columns cols={yearCols} selected={year} onSelect={toggle(setYear)} label={`Discos por año, ${decadeLabel(decade)}`} />
+          <Columns cols={yearCols} selected={year} onSelect={pickYear} label={`Discos por año, ${decadeLabel(decade)}`} />
         </div>
       )}
       <Readout>
         {curYear
           ? <><b>{discos(curYear.count)}</b> · {curYear.value} <Go to={q(String(curYear.value))} /></>
           : otrasSlice
-            ? <><b>{discos(otrasSlice.count)}</b> · otras décadas</>
-            : s.chart && curDec && <><b>{discos(curDec.count)}</b> · {decadeLabel(curDec.value)} · {pct(curDec.count, albums.length)}% <Go to={`/?decada=${curDec.value}`} /></>}
+            ? <><b>{discos(otrasSlice.count)}</b> · {otrasSlice.rest === 1 ? 'otra década' : 'otras décadas'}</>
+            : s.chart && curDec && <><b>{discos(curDec.count)}</b> · {decadeLabel(curDec.value)} · {pct(curDec.count, albums.length)}% de tu colección <Go to={`/?decada=${curDec.value}`} /></>}
       </Readout>
     </div>
   )
@@ -382,7 +409,7 @@ function Generos({ albums }: { albums: Album[] }) {
     <Card id="nu-a3" eyebrow="A3 · Géneros · Estilos" aside={chips && <Chips value={view} options={[{ value: 'genres', label: 'Géneros' }, { value: 'styles', label: 'Estilos' }]} onChange={setView} label="Vista" />}>
       <div key={view} className="nu-xfade nu-card__body">
         <Lead>{s.lead}</Lead>
-        {s.chart && <Reparto rows={s.rows} limit={limit} title={title} total={albums.length} word={`${word}s`} onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={href(r)} /></>} />}
+        {s.chart && <Reparto rows={s.rows} limit={limit} title={title} total={albums.length} word={[word, `${word}s`]} onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={href(r)} /></>} />}
         {s.rows.length > 0 && (
           <Notes>
             <span className="nu-note">Un disco puede traer varios {word}s</span>
@@ -440,7 +467,7 @@ function Sellos({ albums }: { albums: Album[] }) {
   return (
     <Card id="nu-a5" eyebrow="A5 · Sellos">
       <Lead>{s.lead}</Lead>
-      {s.chart && <Reparto rows={s.rows} limit={6} title="Sellos" total={albums.length} word="sellos" onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% <Go to={q(r.label)} /></>} />}
+      {s.chart && <Reparto rows={s.rows} limit={6} title="Sellos" unit={s.without > 0 ? 'con sello' : 'discos'} word={['sello', 'sellos']} onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={q(r.label)} /></>} />}
       {s.without > 0 && s.rows.length > 0 && <Notes><span className="nu-note">{s.without} sin sello</span></Notes>}
       {all && <AllSheet title="Sellos" sub={`${s.rows.length} sellos · ${discos(albums.length)}`} rows={s.rows} total={albums.length} hrefOf={(r) => q(r.label)} foot={s.without > 0 ? { label: 'Sin sello', count: s.without } : undefined} onClose={() => setAll(false)} />}
     </Card>
@@ -538,7 +565,7 @@ function Invertido({ albums }: { albums: Album[] }) {
             <div className="stack" style={{ gap: 8 }}>
               <span className="eyebrow">Dónde compras</span>
               {s.placesChart ? (
-                <Reparto rows={s.places} limit={5} title="Dónde compras" total={albums.length} word="lugares" onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label}</>} />
+                <Reparto rows={s.places} limit={5} title="Dónde compras" unit={withPlace < albums.length ? 'con lugar' : 'discos'} word={['lugar', 'lugares']} onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label}</>} />
               ) : (
                 <span className="nu-line15">{s.places.map((p) => `${p.label} ${p.count}`).join(' · ')}</span>
               )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arcPath, hitSpans } from './NumerosFiguras'
+import { arcPath, focusPath, hitSpans } from './NumerosFiguras'
 
 describe('barra alta · blancos táctiles', () => {
   it('parte el riel sin encimar y ensancha los bloques angostos a costa de los vecinos anchos', () => {
@@ -27,5 +27,9 @@ describe('dona · arcos', () => {
   })
   it('el anillo completo (una sola rebanada) son dos mitades que cierran en el mismo punto', () => {
     expect(arcPath(0, 360, 90)).toBe('M110,20 A90,90 0 0 1 110,200 A90,90 0 0 1 110,20')
+  })
+  it('el contorno de foco cierra la rebanada: arco a 109, arista, arco de regreso a 71 y Z; el anillo completo son dos círculos', () => {
+    expect(focusPath(0, 90)).toBe('M110,1 A109,109 0 0 1 219,110 L181,110 A71,71 0 0 0 110,39 Z')
+    expect(focusPath(0, 360)).toBe(`${arcPath(0, 360, 109)} ${arcPath(0, 360, 71)}`)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { artistStats, casual, donutSlices, OTHER_KEY, conditionStats, copyStats, decadeStats, familyStats, growthStats, hasChart, heroStats, labelStats, moneyStats, monthShort, parseDuration, sentence, starStats, tagStats, tick2, yearsOf } from './stats'
+import { artistStats, casual, donutSlices, OTHER_KEY, otrosLabel, conditionStats, copyStats, decadeStats, familyStats, growthStats, hasChart, heroStats, labelStats, moneyStats, monthShort, parseDuration, sentence, starStats, tagStats, tick2, yearsOf } from './stats'
 import type { Album } from '../types'
 
 const base = { collectionId: 'local', genres: [], styles: [], tracklist: [], addedAt: '2026-01-01T12:00:00.000Z', updatedAt: '2026-01-01T12:00:00.000Z' }
@@ -287,6 +287,8 @@ describe('dona · rebanadas', () => {
   it('los porcentajes cierran en 100 con el ajuste en la mayor no empatada (si todas empatan, la primera)', () => {
     expect(donutSlices(rows([1, 1, 1])).map((x) => x.pct)).toEqual([34, 33, 33])
     expect(donutSlices(rows([2, 1, 1, 1, 1, 1])).map((x) => x.pct)).toEqual([30, 14, 14, 14, 14, 14])
+    // Seis empatadas (16.67 cada una) redondean a 102: el ajuste va de a un punto, nunca los dos a la misma.
+    expect(donutSlices(rows([1, 1, 1, 1, 1, 1])).map((x) => x.pct)).toEqual([16, 16, 17, 17, 17, 17])
     // Como los lugares de la semilla: Discogs y Discos Roma empatan con 12 y deben decir lo mismo; el punto de más lo pone Mercado Libre.
     expect(donutSlices(rows([12, 12, 10, 8, 6, 5, 4])).map((x) => `${x.count}:${x.pct}`)).toEqual(['12:21', '12:21', '10:17', '8:14', '6:11', '9:16'])
   })
@@ -294,5 +296,9 @@ describe('dona · rebanadas', () => {
     const s = donutSlices(rows([2, 5, 3, 1]), { top: 2, otherLabel: 'Otras décadas' })
     expect(s.map((x) => x.key)).toEqual(['k0', 'k1', OTHER_KEY])
     expect(s[2]).toMatchObject({ label: 'Otras décadas', count: 4, rest: 2 })
+  })
+  it('el readout de "Otros" pluraliza según cuántas categorías pliega', () => {
+    expect(otrosLabel(1, 'artista', 'artistas')).toBe('otro artista')
+    expect(otrosLabel(3, 'lugar', 'lugares')).toBe('otros 3 lugares')
   })
 })

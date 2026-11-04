@@ -628,12 +628,18 @@ export interface Slice {
 /** Llave de la rebanada "Otros" (ninguna categoría normalizada la produce). */
 export const OTHER_KEY = '__otros__'
 
+/** Lo que pliega la rebanada "Otros" en el readout: «otro sello» con una sola categoría, «otros 3 sellos» con más. */
+export function otrosLabel(rest: number, singular: string, plural: string): string {
+  return rest === 1 ? `otro ${singular}` : `otros ${rest} ${plural}`
+}
+
 /**
  * Las rebanadas de una dona: las `top` categorías mayores en el orden en que vienen (ya
  * ordenadas) y, si sobra algo, una "Otros" con la suma del resto. Lo que va en 0 no entra.
  * Los porcentajes son enteros sobre la suma de las rebanadas y cierran en 100: el ajuste
- * del redondeo se lo lleva la mayor que no esté empatada (dos rebanadas con el mismo conteo
- * siempre muestran el mismo %); si todas empatan, la primera.
+ * del redondeo va de a un punto por rebanada, primero a la mayor que no esté empatada (dos
+ * rebanadas con el mismo conteo muestran el mismo % mientras se pueda) y luego a las demás de
+ * mayor a menor; así ninguna se aleja más de un punto de su redondeo natural.
  */
 export function donutSlices(rows: { key: string; label: string; count: number }[], { top = 5, otherLabel = 'Otros' }: { top?: number; otherLabel?: string } = {}): Slice[] {
   const withData = rows.filter((r) => r.count > 0)
@@ -644,11 +650,17 @@ export function donutSlices(rows: { key: string; label: string; count: number }[
   const sum = parts.reduce((a, p) => a + p.count, 0)
   if (sum === 0) return []
   const pcts = parts.map((p) => Math.round((p.count / sum) * 100))
-  const diff = 100 - pcts.reduce((a, b) => a + b, 0)
+  let diff = 100 - pcts.reduce((a, b) => a + b, 0)
   if (diff !== 0) {
     const order = parts.map((_, i) => i).sort((a, b) => parts[b].count - parts[a].count || a - b)
     const unique = order.find((i) => parts.every((p, j) => j === i || p.count !== parts[i].count))
-    pcts[unique ?? order[0]] += diff
+    const queue = unique === undefined ? order : [unique, ...order.filter((i) => i !== unique)]
+    const step = Math.sign(diff)
+    for (const i of queue) {
+      if (diff === 0) break
+      pcts[i] += step
+      diff -= step
+    }
   }
   let acc = 0
   return parts.map((p, i) => {
