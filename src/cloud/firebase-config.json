@@ -1,1 +1,8 @@
-{}
+{
+  "apiKey": "AIzaSyAVU-uEMZg3jzdwBjdGwKGXj-vwWJKxEps",
+  "authDomain": "vinylist-bd77d.firebaseapp.com",
+  "projectId": "vinylist-bd77d",
+  "storageBucket": "vinylist-bd77d.firebasestorage.app",
+  "messagingSenderId": "119215673190",
+  "appId": "1:119215673190:web:6c935d62d215af30e6c2a7"
+}
