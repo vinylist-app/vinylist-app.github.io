@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
-import { discos } from '../lib/stats'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { discos, type Slice } from '../lib/stats'
 
 /**
  * Las figuras de "En números": barras horizontales, columnas, la barra alta
@@ -204,4 +204,87 @@ export function Meter({ value, max, text }: { value: number; max: number; text: 
 /** Lo que dice la marca tocada. Sin selección no ocupa espacio, pero sigue siendo la región viva. */
 export function Readout({ children }: { children?: ReactNode }) {
   return <p className={`nu-readout ${children ? '' : 'nu-readout--off'}`} role="status" aria-live="polite">{children}</p>
+}
+
+/* ---------- Dona (modo pastel) ---------- */
+
+export interface DonutDatum extends Slice {
+  /** 5 … 1 = paso de la rampa (de mayor a menor); 0 = --viz-nd ("Otros", "sin dato"). */
+  step: number
+  /** false = nunca lleva su cifra adentro ("Otros", "sin dato"). */
+  text: boolean
+}
+
+const DN_C = 110
+/** Radio medio del anillo: exterior 105, interior 75 (grosor 30). */
+const DN_R = 90
+const DN_RING = 2 * Math.PI * DN_R
+/** Grados mínimos para que la rebanada lleve su cifra adentro. */
+const DN_TEXT_MIN = 36
+
+/** Punto a `deg` grados desde arriba (sentido del reloj) y radio r, con dos decimales. */
+function polar(deg: number, r: number): [number, number] {
+  const a = ((deg - 90) * Math.PI) / 180
+  return [Math.round((DN_C + r * Math.cos(a)) * 100) / 100, Math.round((DN_C + r * Math.sin(a)) * 100) / 100]
+}
+
+/** Arco de a0 a a1 a radio r. El anillo completo va en dos mitades: un arco no puede cerrar sobre su propio inicio. */
+export function arcPath(a0: number, a1: number, r: number): string {
+  if (a1 - a0 >= 360) return `M${polar(0, r).join(',')} A${r},${r} 0 0 1 ${polar(180, r).join(',')} A${r},${r} 0 0 1 ${polar(360, r).join(',')}`
+  return `M${polar(a0, r).join(',')} A${r},${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${polar(a1, r).join(',')}`
+}
+
+/**
+ * La dona: cada rebanada es un arco de trazo grueso (así la entrada es un dash que se dibuja en
+ * secuencia) y es a la vez el botón; encima, hairlines en --card marcan los huecos de 2 px en
+ * cada frontera. El centro es HTML (la elipsis del nombre sale gratis) y la leyenda de abajo es
+ * la vista-tabla rápida: sus filas seleccionan lo mismo que las rebanadas.
+ */
+export function Donut({ slices, selected, onSelect, label, total, unit }: { slices: DonutDatum[]; selected: string | null; onSelect: (key: string) => void; label: string; total: number; unit: string }) {
+  const cur = selected !== null ? slices.find((s) => s.key === selected) : undefined
+  return (
+    <>
+      <div className="nu-donut">
+        <svg viewBox="0 0 220 220" role="group" aria-label={`${label}: ${total} ${unit}`}>
+          {slices.map((s) => {
+            const deg = s.end - s.start
+            const on = selected === s.key
+            const dim = selected !== null && !on
+            // --len con un píxel de sobra: el dash cubre el arco entero aunque el redondeo lo deje un pelo más largo.
+            const style = { '--len': `${((DN_RING * deg) / 360 + 1).toFixed(2)}px`, '--d': `${Math.round((s.start / 360) * 420)}ms`, '--dur': `${Math.max(60, Math.round((deg / 360) * 420))}ms` } as CSSProperties
+            const onKey = (e: KeyboardEvent<SVGPathElement>) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(s.key) } }
+            const [tx, ty] = polar(s.start + deg / 2, DN_R)
+            return (
+              <g key={s.key} className={`nu-donut__part ${dim ? 'nu-donut__part--dim' : ''}`}>
+                <path className="nu-donut__slice" d={arcPath(s.start, s.end, DN_R)} stroke={segFill(s.step)} style={style} role="button" tabIndex={0} aria-label={`${s.label}, ${discos(s.count)}, ${s.pct}%`} aria-pressed={on} onClick={() => onSelect(s.key)} onKeyDown={onKey} />
+                <path className="nu-donut__ring" d={`${arcPath(s.start, s.end, 107)} ${arcPath(s.start, s.end, 73)}`} aria-hidden="true" />
+                {s.text && deg >= DN_TEXT_MIN && <text className="nu-donut__text" x={tx} y={ty} dy="0.35em" textAnchor="middle" fill={s.step > 0 ? `var(--viz-on-${s.step})` : 'transparent'}>{s.pct}%</text>}
+              </g>
+            )
+          })}
+          {slices.length > 1 && slices.map((s) => {
+            const [x1, y1] = polar(s.start, 72)
+            const [x2, y2] = polar(s.start, 108)
+            return <line key={s.key} className="nu-donut__gap" x1={x1} y1={y1} x2={x2} y2={y2} aria-hidden="true" />
+          })}
+        </svg>
+        <div key={cur?.key ?? ''} className="nu-donut__center nu-xfade" aria-hidden="true">
+          <b className="nu-donut__n">{cur ? cur.count : total}</b>
+          <span className="nu-donut__u">{cur ? cur.label : unit}</span>
+        </div>
+      </div>
+      <div className="nu-lrows" role="group" aria-label={`Leyenda: ${label}`}>
+        {slices.map((s) => {
+          const on = selected === s.key
+          return (
+            <button key={s.key} type="button" className={`nu-legend__row ${selected !== null && !on ? 'nu-legend__row--dim' : ''}`} aria-pressed={on} onClick={() => onSelect(s.key)}>
+              <i className="nu-legend__sw" style={{ background: segFill(s.step) }} />
+              <span className="nu-legend__name">{s.label}</span>
+              <span className="nu-legend__val">{s.count} · {s.pct}%</span>
+            </button>
+          )
+        })}
+      </div>
+    </>
+  )
 }

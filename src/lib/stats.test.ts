@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { artistStats, casual, conditionStats, copyStats, decadeStats, familyStats, growthStats, hasChart, heroStats, labelStats, moneyStats, monthShort, parseDuration, sentence, starStats, tagStats, tick2, yearsOf } from './stats'
+import { artistStats, casual, donutSlices, OTHER_KEY, conditionStats, copyStats, decadeStats, familyStats, growthStats, hasChart, heroStats, labelStats, moneyStats, monthShort, parseDuration, sentence, starStats, tagStats, tick2, yearsOf } from './stats'
 import type { Album } from '../types'
 
 const base = { collectionId: 'local', genres: [], styles: [], tracklist: [], addedAt: '2026-01-01T12:00:00.000Z', updatedAt: '2026-01-01T12:00:00.000Z' }
@@ -258,5 +258,41 @@ describe('B4 · familia', () => {
     expect(s.without).toBe(1)
     // Empate en calificados: por nombre.
     expect(s.raters).toEqual([{ uid: 'u2', name: 'Ana', count: 3, avg: 5 }, { uid: 'u1', name: 'Santiago', count: 3, avg: 4 }])
+  })
+})
+
+describe('dona · rebanadas', () => {
+  const rows = (counts: number[]) => counts.map((count, i) => ({ key: `k${i}`, label: `C${i}`, count }))
+  it('top 5 en su orden y "Otros" con la suma y el número del resto', () => {
+    const s = donutSlices(rows([7, 7, 4, 3, 3, 2, 2, 1, 1]), { top: 5 })
+    expect(s.map((x) => `${x.label} ${x.count}`)).toEqual(['C0 7', 'C1 7', 'C2 4', 'C3 3', 'C4 3', 'Otros 6'])
+    expect(s.at(-1)).toMatchObject({ key: OTHER_KEY, rest: 4 })
+    expect(s[0].start).toBe(0)
+    expect(s[0].end).toBeCloseTo((7 / 30) * 360)
+    for (let i = 1; i < s.length; i++) expect(s[i].start).toBeCloseTo(s[i - 1].end)
+    expect(s.at(-1)!.end).toBe(360)
+    expect(s.reduce((a, x) => a + x.pct, 0)).toBe(100)
+  })
+  it('con menos categorías que el tope no hay "Otros"; las de 0 no entran', () => {
+    const s = donutSlices(rows([5, 3, 0]))
+    expect(s.map((x) => x.key)).toEqual(['k0', 'k1'])
+    expect(s.every((x) => x.rest === undefined)).toBe(true)
+    // 62.5 y 37.5 redondean a 63 y 38: el punto de más se lo quita la mayor.
+    expect(s.map((x) => x.pct)).toEqual([62, 38])
+  })
+  it('una sola rebanada es el anillo completo', () => {
+    expect(donutSlices(rows([4]))).toEqual([{ key: 'k0', label: 'C0', count: 4, pct: 100, start: 0, end: 360 }])
+    expect(donutSlices(rows([0, 0]))).toEqual([])
+  })
+  it('los porcentajes cierran en 100 con el ajuste en la mayor no empatada (si todas empatan, la primera)', () => {
+    expect(donutSlices(rows([1, 1, 1])).map((x) => x.pct)).toEqual([34, 33, 33])
+    expect(donutSlices(rows([2, 1, 1, 1, 1, 1])).map((x) => x.pct)).toEqual([30, 14, 14, 14, 14, 14])
+    // Como los lugares de la semilla: Discogs y Discos Roma empatan con 12 y deben decir lo mismo; el punto de más lo pone Mercado Libre.
+    expect(donutSlices(rows([12, 12, 10, 8, 6, 5, 4])).map((x) => `${x.count}:${x.pct}`)).toEqual(['12:21', '12:21', '10:17', '8:14', '6:11', '9:16'])
+  })
+  it('orden estable: no reordena lo que recibe, y la cola lleva el nombre que se le pida', () => {
+    const s = donutSlices(rows([2, 5, 3, 1]), { top: 2, otherLabel: 'Otras décadas' })
+    expect(s.map((x) => x.key)).toEqual(['k0', 'k1', OTHER_KEY])
+    expect(s[2]).toMatchObject({ label: 'Otras décadas', count: 4, rest: 2 })
   })
 })

@@ -48,6 +48,11 @@
 /* Los chips de vista van a la derecha del eyebrow; si no caben, bajan a su propia línea sin partir el título. */
 .nu-chips { display: flex; gap: 6px; flex: none; margin-left: auto; }
 .nu-chips .chip { padding: 0 9px; font-size: 13px; }
+/* Barras | Pastel: un solo control para toda la pantalla, debajo del héroe; mismos chips que las vistas. */
+.nu-figura { display: flex; gap: 6px; }
+.nu-figura .chip { padding: 0 9px; font-size: 13px; }
+/* La figura con su cola y su readout: hereda el hueco de donde cae (la tarjeta o el stack de "Dónde compras"). */
+.nu-fig { display: flex; flex-direction: column; gap: inherit; }
 .nu-lead { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.2; letter-spacing: -0.01em; color: var(--text); font-variation-settings: 'opsz' 96, 'wdth' 100; overflow-wrap: anywhere; }
 .nu-sub { font-size: 15px; color: var(--text-2); line-height: 1.4; margin-top: -4px; }
 .nu-line15 { font-size: 15px; color: var(--text); line-height: 1.4; overflow-wrap: anywhere; }
@@ -135,6 +140,34 @@
 .nu-legend li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
 .nu-legend i { display: block; width: 10px; height: 10px; border-radius: 2px; flex: none; }
 
+/* ---------- Dona (modo pastel) ---------- */
+/* 220 px centrados (hasta 260 en pantallas anchas). Cada rebanada es un arco de trazo 30 (radio
+   75–105): así la entrada es un dash que se dibuja. Huecos de 2 px: hairlines en --card sobre
+   cada frontera. El foco es un anillo en --label por fuera y por dentro de la rebanada (el
+   outline de un path sería su caja). */
+.nu-donut { position: relative; width: clamp(220px, 60%, 260px); margin: 0 auto; }
+.nu-donut svg { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; overflow: visible; }
+.nu-donut__slice { fill: none; stroke-width: 30; stroke-dasharray: var(--len); cursor: pointer; }
+.nu-donut__part--dim .nu-donut__slice { opacity: 0.4; }
+.nu-donut__part--dim .nu-donut__text { fill: transparent; }
+.nu-donut__text { font-family: var(--mono); font-size: 12px; font-weight: 600; pointer-events: none; }
+.nu-donut__gap { stroke: var(--card); stroke-width: 2; pointer-events: none; }
+.nu-donut__ring { fill: none; stroke: var(--label); stroke-width: 2; opacity: 0; pointer-events: none; }
+/* Chrome le pone a un path enfocado (hasta por tap) un outline `auto` en el color del sistema: fuera; el anillo de abajo es el foco visible. */
+.nu .nu-donut__slice:focus { outline: 0; }
+.nu-donut__slice:focus-visible + .nu-donut__ring { opacity: 1; }
+/* Centro: el total de la sección y su unidad; al tocar, el conteo y el nombre de la rebanada (con elipsis). */
+.nu-donut__center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; pointer-events: none; text-align: center; }
+.nu-donut__n { font-family: var(--body); font-weight: 700; font-size: 28px; line-height: 1; letter-spacing: -0.01em; color: var(--text); }
+.nu-donut__u { max-width: 120px; font-size: 12px; line-height: 1.3; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Leyenda de la dona: la vista-tabla rápida; cada fila es un botón que selecciona su rebanada. */
+.nu-lrows { display: flex; flex-direction: column; }
+.nu-legend__row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; margin: 0; padding: 0; border: 0; border-radius: var(--radius); background: transparent; color: var(--text); font: inherit; text-align: left; }
+.nu-legend__sw { display: block; flex: none; width: 10px; height: 10px; border-radius: 2px; }
+.nu-legend__name { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nu-legend__val { flex: none; font-family: var(--mono); font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.nu-legend__row--dim .nu-legend__sw { opacity: 0.4; }
+
 /* ---------- Meter (calificados contra el total) ---------- */
 .nu-meter { display: flex; flex-direction: column; gap: 6px; }
 .nu-meter__stat { font-weight: 600; font-size: 15px; }
@@ -186,4 +219,12 @@ button.nu-trow:active { background: var(--card-2); }
   .nu-tile { animation: nu-rise 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
   .nu-xfade, .nu-readout:not(.nu-readout--off) { animation: nu-fade 150ms cubic-bezier(0.2, 0.8, 0.2, 1); }
   .nu-tile--btn, .nu-trow, .nu-line { transition: background-color 120ms ease; }
+  /* Dona: antes de entrar, cada arco está recogido (dash fuera) y el centro y las cifras invisibles;
+     al entrar se dibujan en secuencia (420 ms entre todas) y el centro y las cifras aparecen al final. */
+  .nu-card:not(.nu-in) .nu-donut__slice { stroke-dashoffset: var(--len); }
+  .nu-card:not(.nu-in) .nu-donut__text, .nu-card:not(.nu-in) .nu-donut__center { opacity: 0; }
+  .nu-donut__slice { transition: stroke-dashoffset var(--dur, 420ms) cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms), opacity 120ms; }
+  .nu-donut__text { transition: opacity 150ms 420ms, fill 120ms; }
+  .nu-donut__center { transition: opacity 300ms 180ms; }
+  .nu-legend__sw { transition: opacity 120ms; }
 }

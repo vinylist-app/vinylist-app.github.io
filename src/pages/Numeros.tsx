@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAlbums } from '../data/hooks'
 import { personName, useSession } from '../session'
@@ -8,8 +8,9 @@ import { ChevronIcon } from '../components/CuentaIcons'
 import { Sheet } from '../components/Sheet'
 import { Cover } from '../components/AlbumCard'
 import { StarRating } from '../components/StarRating'
-import { Columns, HBars, Meter, Readout, SegBar, segFill, type ColDatum } from '../components/NumerosFiguras'
-import { artistStats, copyStats, decadeStats, discos, familyStats, growthStats, heroStats, labelStats, moneyStats, pct, starStats, tagStats, yearsOf, type Bucket, type CondStats, type Extreme } from '../lib/stats'
+import { Columns, Donut, HBars, Meter, Readout, SegBar, segFill, type ColDatum, type DonutDatum } from '../components/NumerosFiguras'
+import { artistStats, copyStats, decadeStats, discos, donutSlices, familyStats, growthStats, heroStats, labelStats, moneyStats, OTHER_KEY, pct, starStats, tagStats, yearsOf, type Bucket, type CondStats, type DecadeStats, type Extreme } from '../lib/stats'
+import { getFigura, setFigura, type Figura } from '../lib/figura'
 import { cleanArtist, decadeLabel, priceLabel } from '../lib/text'
 import { ariaTextFor } from '../lib/starSlider'
 import type { Album } from '../types'
@@ -70,12 +71,24 @@ const toggle = (set: (f: (prev: string | null) => string | null) => void) => (ke
 
 const q = (s: string) => `/?q=${encodeURIComponent(s)}`
 
+/** Barras o pastel: una sola preferencia para toda la pantalla (se guarda por celular). */
+const FiguraContext = createContext<Figura>('barras')
+/** Una dona nunca pasa de 6 rebanadas: las 5 mayores y "Otros". */
+const DONUT_TOP = 5
+
+/** Las rebanadas de una sección: las 5 mayores recorren la rampa de --viz-5 a --viz-1 y "Otros" va en --viz-nd, sin cifra. */
+function donutOf(rows: Bucket[], otherLabel = 'Otros'): DonutDatum[] {
+  return donutSlices(rows, { top: DONUT_TOP, otherLabel }).map((s, i) => (s.key === OTHER_KEY ? { ...s, step: 0, text: false } : { ...s, step: DONUT_TOP - i, text: true }))
+}
+
 export function Numeros() {
   const loaded = useAlbums()
   const albums = loaded ?? []
   const n = albums.length
   const { collection } = useSession()
   const family = Boolean(collection && Object.keys(collection.members).length >= 2)
+  const [figura, setFig] = useState<Figura>(getFigura)
+  const changeFigura = (f: Figura) => { setFigura(f); setFig(f) }
 
   return (
     <main className="page nu">
@@ -101,8 +114,9 @@ export function Numeros() {
           <Link to="/escanear" className="btn btn--primary">Escanear un disco</Link>
         </div>
       ) : (
-        <>
+        <FiguraContext value={figura}>
           <Hero albums={albums} />
+          <Chips className="nu-figura" value={figura} options={[{ value: 'barras', label: 'Barras' }, { value: 'pastel', label: 'Pastel' }]} onChange={changeFigura} label="Tipo de gráfica" />
           <Lado label="Lado A · La música" />
           <Artistas albums={albums} />
           <Anos albums={albums} />
@@ -115,7 +129,7 @@ export function Numeros() {
           <Invertido albums={albums} />
           {family && <Familia albums={albums} />}
           <p className="muted" style={{ textAlign: 'center' }}>Entre más llenes en cada ficha, más te cuento.</p>
-        </>
+        </FiguraContext>
       )}
     </main>
   )
@@ -166,12 +180,41 @@ function FixedLine({ k, album, value }: { k: string; album: Album; value: string
   )
 }
 
-function Chips<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+function Chips<T extends string>({ value, options, onChange, label, className = 'nu-chips' }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string; className?: string }) {
   return (
-    <div className="nu-chips" role="group" aria-label={label}>
+    <div className={className} role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.value} type="button" className={`chip ${value === o.value ? 'chip--on' : ''}`} aria-pressed={value === o.value} onClick={() => onChange(o.value)}>{o.label}</button>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Parte-de-un-todo (A1, A3, A5, B3): barras ordenadas (top `limit`) o, en modo pastel, la dona
+ * (top 5 + Otros) con su leyenda. La cola «y N más · Ver todos ›» y el readout van igual en los
+ * dos modos; «Otros» solo dice cuántas categorías pliega. Cambiar de modo remonta la figura
+ * (cross-fade) y con ella suelta la selección.
+ */
+function Reparto(props: { rows: Bucket[]; limit: number; title: string; total: number; word: string; readout: (r: Bucket) => ReactNode; onAll?: () => void }) {
+  const figura = useContext(FiguraContext)
+  return <RepartoFig key={figura} pastel={figura === 'pastel'} {...props} />
+}
+
+function RepartoFig({ rows, limit, title, total, word, readout, onAll, pastel }: { rows: Bucket[]; limit: number; title: string; total: number; word: string; readout: (r: Bucket) => ReactNode; onAll?: () => void; pastel: boolean }) {
+  const [sel, setSel] = useState<string | null>(null)
+  const shown = rows.slice(0, pastel ? DONUT_TOP : limit)
+  const rest = rows.length - shown.length
+  const slices = useMemo(() => (pastel ? donutOf(rows) : []), [pastel, rows])
+  const cur = sel ? rows.find((r) => r.key === sel) : undefined
+  const other = sel === OTHER_KEY ? slices.find((s) => s.key === OTHER_KEY) : undefined
+  return (
+    <div className="nu-xfade nu-fig">
+      {pastel
+        ? <Donut slices={slices} selected={sel} onSelect={toggle(setSel)} label={title} total={total} unit="discos" />
+        : <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />}
+      {rest > 0 && onAll && <More n={rest} onClick={onAll} />}
+      <Readout>{cur ? readout(cur) : other && <><b>{discos(other.count)}</b> · otros {other.rest} {word}</>}</Readout>
     </div>
   )
 }
@@ -227,21 +270,11 @@ function Hero({ albums }: { albums: Album[] }) {
 
 function Artistas({ albums }: { albums: Album[] }) {
   const s = useMemo(() => artistStats(albums), [albums])
-  const [sel, setSel] = useState<string | null>(null)
   const [all, setAll] = useState(false)
-  const shown = s.rows.slice(0, 8)
-  const rest = s.rows.length - shown.length
-  const cur = sel ? s.rows.find((r) => r.key === sel) : undefined
   return (
     <Card id="nu-a1" eyebrow="A1 · Artistas">
       <Lead>{s.lead}</Lead>
-      {s.chart && (
-        <>
-          <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-          {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
-          <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% de tu colección <Go to={q(cur.label)} /></>}</Readout>
-        </>
-      )}
+      {s.chart && <Reparto rows={s.rows} limit={8} title="Artistas" total={albums.length} word="artistas" onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={q(r.label)} /></>} />}
       {s.various > 0 && <Notes><span className="nu-note">{s.various} de varios artistas no {s.various === 1 ? 'cuenta' : 'cuentan'} aquí</span></Notes>}
       {all && <AllSheet title="Artistas" sub={`${s.rows.length} artistas · ${discos(albums.length)}`} rows={s.rows} total={albums.length} hrefOf={(r) => q(r.label)} foot={s.various > 0 ? { label: 'Varios artistas', count: s.various } : undefined} onClose={() => setAll(false)} />}
     </Card>
@@ -257,36 +290,11 @@ function extremeText(e: Extreme): string {
 
 function Anos({ albums }: { albums: Album[] }) {
   const s = useMemo(() => decadeStats(albums), [albums])
-  const [dec, setDec] = useState<string | null>(s.top !== undefined ? String(s.top) : null)
-  const [year, setYear] = useState<string | null>(null)
-  useEffect(() => { setDec(s.top !== undefined ? String(s.top) : null); setYear(null) }, [s.top])
-  const decade = dec !== null ? Number(dec) : null
-  const years = useMemo(() => (decade !== null ? yearsOf(albums, decade) : []), [albums, decade])
-
-  const decCols: ColDatum[] = s.decades.map((d) => ({ key: String(d.value), tick: d.tick, count: d.count, name: decadeLabel(d.value) }))
-  const yearCols: ColDatum[] = years.map((y) => ({ key: String(y.value), tick: y.tick, count: y.count, name: String(y.value) }))
-  const curDec = decade !== null ? s.decades.find((d) => d.value === decade) : undefined
-  const curYear = year !== null ? years.find((y) => String(y.value) === year) : undefined
-
+  const figura = useContext(FiguraContext)
   return (
     <Card id="nu-a2" eyebrow="A2 · De qué año son">
       <Lead>{s.lead}</Lead>
-      {(s.chart || s.chartYears) && (
-        <>
-          {s.chart && <Columns cols={decCols} selected={dec} onSelect={(k) => { setYear(null); setDec((p) => (p === k ? null : k)) }} label="Discos por década" />}
-          {decade !== null && (
-            <div key={decade} className="nu-xfade nu-years">
-              <span className="nu-years__k">Por año · {decadeLabel(decade)}</span>
-              <Columns cols={yearCols} selected={year} onSelect={toggle(setYear)} label={`Discos por año, ${decadeLabel(decade)}`} />
-            </div>
-          )}
-          <Readout>
-            {curYear
-              ? <><b>{discos(curYear.count)}</b> · {curYear.value} <Go to={q(String(curYear.value))} /></>
-              : s.chart && curDec && <><b>{discos(curDec.count)}</b> · {decadeLabel(curDec.value)} · {pct(curDec.count, albums.length)}% <Go to={`/?decada=${curDec.value}`} /></>}
-          </Readout>
-        </>
-      )}
+      {(s.chart || s.chartYears) && <AnosFig key={figura} albums={albums} s={s} pastel={figura === 'pastel'} />}
       {s.oldest && s.newest && (
         <div className="nu-lines">
           <FixedLine k="El más viejo" album={s.oldest.album} value={extremeText(s.oldest)} />
@@ -298,6 +306,63 @@ function Anos({ albums }: { albums: Album[] }) {
   )
 }
 
+/**
+ * La figura de A2: columnas por década (o, en pastel, la dona de las 5 décadas mayores + «Otras
+ * décadas») y debajo los diez años de la década seleccionada (por defecto la mayor), que siguen
+ * siendo columnas en los dos modos. «Otras décadas» se marca y da su readout, pero no cambia la
+ * fila de años. Se remonta al cambiar de modo (cross-fade) y vuelve a la década por defecto.
+ */
+function AnosFig({ albums, s, pastel }: { albums: Album[]; s: DecadeStats; pastel: boolean }) {
+  const [dec, setDec] = useState<string | null>(s.top !== undefined ? String(s.top) : null)
+  const [year, setYear] = useState<string | null>(null)
+  /** «Otras décadas» tocada en la dona (la década del drill-down se queda). */
+  const [otras, setOtras] = useState(false)
+  useEffect(() => { setDec(s.top !== undefined ? String(s.top) : null); setYear(null); setOtras(false) }, [s.top])
+  const decade = dec !== null ? Number(dec) : null
+  const years = useMemo(() => (decade !== null ? yearsOf(albums, decade) : []), [albums, decade])
+
+  const decCols: ColDatum[] = s.decades.map((d) => ({ key: String(d.value), tick: d.tick, count: d.count, name: decadeLabel(d.value) }))
+  // Dona: las décadas con dato por conteo (empate: la más reciente primero), las 5 mayores y «Otras décadas».
+  const decSlices = useMemo(() => {
+    if (!pastel) return []
+    const ranked = s.decades.filter((d) => d.count > 0).sort((a, b) => b.count - a.count || b.value - a.value)
+    return donutOf(ranked.map((d) => ({ key: String(d.value), label: decadeLabel(d.value), count: d.count })), 'Otras décadas')
+  }, [pastel, s.decades])
+  const withYear = s.decades.reduce((a, d) => a + d.count, 0)
+  const yearCols: ColDatum[] = years.map((y) => ({ key: String(y.value), tick: y.tick, count: y.count, name: String(y.value) }))
+  const curDec = decade !== null ? s.decades.find((d) => d.value === decade) : undefined
+  const curYear = year !== null ? years.find((y) => String(y.value) === year) : undefined
+  const otrasSlice = otras ? decSlices.find((d) => d.key === OTHER_KEY) : undefined
+
+  const pickDec = (k: string) => { setYear(null); setDec((p) => (p === k ? null : k)) }
+  const pickSlice = (k: string) => {
+    if (k === OTHER_KEY) { setOtras((o) => !o); return }
+    setOtras(false)
+    pickDec(k)
+  }
+
+  return (
+    <div className="nu-xfade nu-fig">
+      {s.chart && (pastel
+        ? <Donut slices={decSlices} selected={otras ? OTHER_KEY : dec} onSelect={pickSlice} label="Discos por década" total={withYear} unit="con año" />
+        : <Columns cols={decCols} selected={dec} onSelect={pickDec} label="Discos por década" />)}
+      {decade !== null && (
+        <div key={decade} className="nu-xfade nu-years">
+          <span className="nu-years__k">Por año · {decadeLabel(decade)}</span>
+          <Columns cols={yearCols} selected={year} onSelect={toggle(setYear)} label={`Discos por año, ${decadeLabel(decade)}`} />
+        </div>
+      )}
+      <Readout>
+        {curYear
+          ? <><b>{discos(curYear.count)}</b> · {curYear.value} <Go to={q(String(curYear.value))} /></>
+          : otrasSlice
+            ? <><b>{discos(otrasSlice.count)}</b> · otras décadas</>
+            : s.chart && curDec && <><b>{discos(curDec.count)}</b> · {decadeLabel(curDec.value)} · {pct(curDec.count, albums.length)}% <Go to={`/?decada=${curDec.value}`} /></>}
+      </Readout>
+    </div>
+  )
+}
+
 /* ---------- A3 · Géneros · Estilos ---------- */
 
 function Generos({ albums }: { albums: Album[] }) {
@@ -305,29 +370,19 @@ function Generos({ albums }: { albums: Album[] }) {
   const st = useMemo(() => tagStats(albums, 'styles'), [albums])
   // Arranca en la vista que tenga filas; los chips existen en cuanto algún disco trae estilos.
   const [view, setView] = useState<'genres' | 'styles'>(g.rows.length > 0 || st.rows.length === 0 ? 'genres' : 'styles')
-  const [sel, setSel] = useState<string | null>(null)
   const [all, setAll] = useState(false)
   const chips = st.rows.length > 0
   const s = view === 'genres' ? g : st
   const limit = view === 'genres' ? 6 : 8
-  const shown = s.rows.slice(0, limit)
-  const rest = s.rows.length - shown.length
-  const cur = sel ? s.rows.find((r) => r.key === sel) : undefined
   const word = view === 'genres' ? 'género' : 'estilo'
   const title = view === 'genres' ? 'Géneros' : 'Estilos'
   const href = (r: Bucket) => `/?genero=${encodeURIComponent(r.raw ?? r.label)}`
 
   return (
-    <Card id="nu-a3" eyebrow="A3 · Géneros · Estilos" aside={chips && <Chips value={view} options={[{ value: 'genres', label: 'Géneros' }, { value: 'styles', label: 'Estilos' }]} onChange={(v) => { setView(v); setSel(null) }} label="Vista" />}>
+    <Card id="nu-a3" eyebrow="A3 · Géneros · Estilos" aside={chips && <Chips value={view} options={[{ value: 'genres', label: 'Géneros' }, { value: 'styles', label: 'Estilos' }]} onChange={setView} label="Vista" />}>
       <div key={view} className="nu-xfade nu-card__body">
         <Lead>{s.lead}</Lead>
-        {s.chart && (
-          <>
-            <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-            {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
-            <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% de tu colección <Go to={href(cur)} /></>}</Readout>
-          </>
-        )}
+        {s.chart && <Reparto rows={s.rows} limit={limit} title={title} total={albums.length} word={`${word}s`} onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% de tu colección <Go to={href(r)} /></>} />}
         {s.rows.length > 0 && (
           <Notes>
             <span className="nu-note">Un disco puede traer varios {word}s</span>
@@ -381,21 +436,11 @@ function Estrellas({ albums }: { albums: Album[] }) {
 
 function Sellos({ albums }: { albums: Album[] }) {
   const s = useMemo(() => labelStats(albums), [albums])
-  const [sel, setSel] = useState<string | null>(null)
   const [all, setAll] = useState(false)
-  const shown = s.rows.slice(0, 6)
-  const rest = s.rows.length - shown.length
-  const cur = sel ? s.rows.find((r) => r.key === sel) : undefined
   return (
     <Card id="nu-a5" eyebrow="A5 · Sellos">
       <Lead>{s.lead}</Lead>
-      {s.chart && (
-        <>
-          <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-          {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
-          <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, albums.length)}% <Go to={q(cur.label)} /></>}</Readout>
-        </>
-      )}
+      {s.chart && <Reparto rows={s.rows} limit={6} title="Sellos" total={albums.length} word="sellos" onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label} · {pct(r.count, albums.length)}% <Go to={q(r.label)} /></>} />}
       {s.without > 0 && s.rows.length > 0 && <Notes><span className="nu-note">{s.without} sin sello</span></Notes>}
       {all && <AllSheet title="Sellos" sub={`${s.rows.length} sellos · ${discos(albums.length)}`} rows={s.rows} total={albums.length} hrefOf={(r) => q(r.label)} foot={s.without > 0 ? { label: 'Sin sello', count: s.without } : undefined} onClose={() => setAll(false)} />}
     </Card>
@@ -425,10 +470,12 @@ function Crecimiento({ albums }: { albums: Album[] }) {
 
 /* ---------- B2 · Tus copias ---------- */
 
-function Condicion({ c, total, view }: { c: CondStats; total: number; view: string }) {
+function Condicion({ c, total, view, pastel }: { c: CondStats; total: number; view: string; pastel: boolean }) {
   const [sel, setSel] = useState<string | null>(null)
   const [all, setAll] = useState(false)
   const segs = c.blocks.map((b) => ({ key: b.key, label: b.label, count: b.count, step: b.step, text: b.step > 0 ? `${pct(b.count, total)}%` : '' }))
+  // La dona lleva los mismos bloques, en el mismo orden y con los mismos colores por estado; "sin dato" sin cifra.
+  const slices = useMemo(() => (pastel ? donutSlices(c.blocks, { top: c.blocks.length }).map((s) => { const step = c.blocks.find((b) => b.key === s.key)?.step ?? 0; return { ...s, step, text: step > 0 } }) : []), [pastel, c.blocks])
   const cur = sel ? c.blocks.find((b) => b.key === sel) : undefined
   const visible = c.blocks.filter((b) => b.count > 0)
   const title = `Estado ${view === 'media' ? 'del disco' : 'de la funda'}`
@@ -440,10 +487,16 @@ function Condicion({ c, total, view }: { c: CondStats; total: number; view: stri
       <Lead>{c.lead}</Lead>
       {c.enough && (
         <>
-          <SegBar segs={segs} selected={sel} onSelect={toggle(setSel)} label={title} describe={(s) => (s.step > 0 ? `${s.label}, ${discos(s.count)}, ${pct(s.count, c.withData)}% de los que tienen estado` : `Sin dato, ${discos(s.count)}`)} />
-          <ul className="nu-legend">
-            {visible.map((b) => <li key={b.key}><i style={{ background: segFill(b.step) }} />{b.label}</li>)}
-          </ul>
+          {pastel
+            ? <Donut slices={slices} selected={sel} onSelect={toggle(setSel)} label={title} total={c.withData} unit="con estado" />
+            : (
+              <>
+                <SegBar segs={segs} selected={sel} onSelect={toggle(setSel)} label={title} describe={(s) => (s.step > 0 ? `${s.label}, ${discos(s.count)}, ${pct(s.count, c.withData)}% de los que tienen estado` : `Sin dato, ${discos(s.count)}`)} />
+                <ul className="nu-legend">
+                  {visible.map((b) => <li key={b.key}><i style={{ background: segFill(b.step) }} />{b.label}</li>)}
+                </ul>
+              </>
+            )}
           <More onClick={() => setAll(true)} />
           <Readout>{cur && (cur.step > 0 ? <><b>{discos(cur.count)}</b> · {cur.label} · {pct(cur.count, c.withData)}% de los que tienen estado</> : <><b>{discos(cur.count)}</b> · sin dato</>)}</Readout>
         </>
@@ -456,10 +509,11 @@ function Condicion({ c, total, view }: { c: CondStats; total: number; view: stri
 function Copias({ albums }: { albums: Album[] }) {
   const s = useMemo(() => copyStats(albums), [albums])
   const [view, setView] = useState<'media' | 'sleeve'>('media')
+  const figura = useContext(FiguraContext)
   const c = view === 'media' ? s.media : s.sleeve
   return (
     <Card id="nu-b2" eyebrow="B2 · Tus copias" aside={s.anySleeve && (s.media.enough || s.sleeve.enough) && <Chips value={view} options={[{ value: 'media', label: 'Disco' }, { value: 'sleeve', label: 'Funda' }]} onChange={setView} label="Condición de" />}>
-      <Condicion key={view} c={c} total={albums.length} view={view} />
+      <Condicion key={`${view}:${figura}`} c={c} total={albums.length} view={view} pastel={figura === 'pastel'} />
       <div className="nu-kvs">
         <div className="nu-kv"><span className="nu-kv__k">Formato</span><span className="nu-kv__v">{s.formatLine}</span></div>
         {s.countryLine && <div className="nu-kv"><span className="nu-kv__k">Prensados en</span><span className="nu-kv__v">{s.countryLine}</span></div>}
@@ -472,11 +526,7 @@ function Copias({ albums }: { albums: Album[] }) {
 
 function Invertido({ albums }: { albums: Album[] }) {
   const s = useMemo(() => moneyStats(albums), [albums])
-  const [sel, setSel] = useState<string | null>(null)
   const [all, setAll] = useState(false)
-  const shown = s.places.slice(0, 5)
-  const rest = s.places.length - shown.length
-  const cur = sel ? s.places.find((r) => r.key === sel) : undefined
   const withPlace = s.places.reduce((a, r) => a + r.count, 0)
   return (
     <Card id="nu-b3" eyebrow="B3 · Lo que llevas invertido">
@@ -488,11 +538,7 @@ function Invertido({ albums }: { albums: Album[] }) {
             <div className="stack" style={{ gap: 8 }}>
               <span className="eyebrow">Dónde compras</span>
               {s.placesChart ? (
-                <>
-                  <HBars rows={shown} selected={sel} onSelect={toggle(setSel)} />
-                  {rest > 0 && <More n={rest} onClick={() => setAll(true)} />}
-                  <Readout>{cur && <><b>{discos(cur.count)}</b> · {cur.label}</>}</Readout>
-                </>
+                <Reparto rows={s.places} limit={5} title="Dónde compras" total={albums.length} word="lugares" onAll={() => setAll(true)} readout={(r) => <><b>{discos(r.count)}</b> · {r.label}</>} />
               ) : (
                 <span className="nu-line15">{s.places.map((p) => `${p.label} ${p.count}`).join(' · ')}</span>
               )}

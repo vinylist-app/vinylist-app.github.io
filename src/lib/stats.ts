@@ -609,3 +609,52 @@ export function familyStats(albums: Album[], nameOf: (uid: string) => string): F
   raters.sort((x, y) => y.count - x.count || byName(x.name, y.name))
   return { rows, without, lead, chart: hasChart(rows), raters }
 }
+
+/* ---------- Dona (modo pastel) ---------- */
+
+/** Una rebanada de la dona; ángulos en grados desde arriba, en el sentido del reloj. */
+export interface Slice {
+  key: string
+  label: string
+  count: number
+  /** Entero sobre la suma de las rebanadas; entre todas cierran en 100. */
+  pct: number
+  start: number
+  end: number
+  /** Solo en "Otros": cuántas categorías pliega. */
+  rest?: number
+}
+
+/** Llave de la rebanada "Otros" (ninguna categoría normalizada la produce). */
+export const OTHER_KEY = '__otros__'
+
+/**
+ * Las rebanadas de una dona: las `top` categorías mayores en el orden en que vienen (ya
+ * ordenadas) y, si sobra algo, una "Otros" con la suma del resto. Lo que va en 0 no entra.
+ * Los porcentajes son enteros sobre la suma de las rebanadas y cierran en 100: el ajuste
+ * del redondeo se lo lleva la mayor que no esté empatada (dos rebanadas con el mismo conteo
+ * siempre muestran el mismo %); si todas empatan, la primera.
+ */
+export function donutSlices(rows: { key: string; label: string; count: number }[], { top = 5, otherLabel = 'Otros' }: { top?: number; otherLabel?: string } = {}): Slice[] {
+  const withData = rows.filter((r) => r.count > 0)
+  const parts: Omit<Slice, 'pct' | 'start' | 'end'>[] = withData.slice(0, top).map((r) => ({ key: r.key, label: r.label, count: r.count }))
+  const tail = withData.slice(top)
+  const restCount = tail.reduce((a, r) => a + r.count, 0)
+  if (restCount > 0) parts.push({ key: OTHER_KEY, label: otherLabel, count: restCount, rest: tail.length })
+  const sum = parts.reduce((a, p) => a + p.count, 0)
+  if (sum === 0) return []
+  const pcts = parts.map((p) => Math.round((p.count / sum) * 100))
+  const diff = 100 - pcts.reduce((a, b) => a + b, 0)
+  if (diff !== 0) {
+    const order = parts.map((_, i) => i).sort((a, b) => parts[b].count - parts[a].count || a - b)
+    const unique = order.find((i) => parts.every((p, j) => j === i || p.count !== parts[i].count))
+    pcts[unique ?? order[0]] += diff
+  }
+  let acc = 0
+  return parts.map((p, i) => {
+    const start = (acc / sum) * 360
+    acc += p.count
+    const end = i === parts.length - 1 ? 360 : (acc / sum) * 360
+    return { ...p, pct: pcts[i], start, end }
+  })
+}
