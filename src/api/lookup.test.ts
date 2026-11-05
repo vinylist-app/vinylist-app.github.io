@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { albumKey } from '../lib/text'
 import type { ReleaseCandidate } from '../types'
 
 const discogs = { configured: false, text: vi.fn(), barcode: vi.fn() }
@@ -9,7 +10,7 @@ vi.mock('./musicbrainz', () => ({ searchByText: mb.text, searchByBarcode: mb.bar
 vi.mock('./itunes', () => ({ searchArtwork: itunes.art }))
 
 const cand = (o: Partial<ReleaseCandidate>): ReleaseCandidate => ({ source: 'musicbrainz', sourceId: 'x', title: 'Rumours', artist: 'Fleetwood Mac', genres: [], styles: [], ...o })
-const art = (pairs: [string, string, string][]) => new Map(pairs.map(([a, t, u]) => [`${a.toLowerCase()}|${t.toLowerCase()}`, u]))
+const art = (pairs: [string, string, string][]) => new Map(pairs.map(([a, t, u]) => [albumKey(a, t), u]))
 
 describe('lookupText', () => {
   beforeEach(() => {
@@ -25,6 +26,17 @@ describe('lookupText', () => {
     expect(itunes.art).toHaveBeenCalledWith('rumours')
     expect(found.map((c) => c.altCoverUrl)).toEqual(['https://m/fm/600x600bb.jpg', undefined])
     expect(discogs.text).not.toHaveBeenCalled()
+  })
+
+  it('recopilaciones ("Various Artists", "Varios"): sin portada de Apple Music, y por código de barras ni se consulta', async () => {
+    const { lookupText, lookupBarcode } = await import('./lookup')
+    mb.text.mockResolvedValue([cand({ sourceId: 'va', artist: 'Various Artists', title: 'Greatest Hits of the 80s' })])
+    itunes.art.mockResolvedValue(art([['Various Artists', 'Greatest Hits of the 80s', 'https://m/va/600x600bb.jpg']]))
+    expect((await lookupText('greatest hits of the 80s'))[0].altCoverUrl).toBeUndefined()
+    itunes.art.mockClear()
+    mb.barcode.mockResolvedValue([cand({ sourceId: 'va', artist: 'Varios', title: 'Grandes éxitos' })])
+    expect((await lookupBarcode('123'))[0].altCoverUrl).toBeUndefined()
+    expect(itunes.art).not.toHaveBeenCalled()
   })
 
   it('con Discogs configurado y resultados, no se toca ni MusicBrainz ni Apple Music', async () => {

@@ -49,20 +49,27 @@ function loads(url: string, timeoutMs: number): Promise<boolean> {
       img.onload = img.onerror = null
       resolve(ok)
     }
-    timer = setTimeout(() => done(false), timeoutMs)
+    // Al vencer el tiempo, vaciar la fuente corta la descarga; ya sin manejadores, el onerror que eso dispara no entra aquí.
+    timer = setTimeout(() => {
+      done(false)
+      img.src = ''
+    }, timeoutMs)
     img.onload = () => done(true)
     img.onerror = () => done(false)
     img.src = url
   })
 }
 
+/** Al guardar, la vista previa ya cargó la cadena (está en caché); si Cover Art Archive no responde, no vale la pena esperar más por cada URL. */
+const SAVE_TIMEOUT_MS = 2500
+
 /**
  * Lo que se guarda como portada al agregar una edición a la colección o a deseos: para MusicBrainz,
  * la URL de la cadena que de verdad carga y su miniatura; si ninguna carga (o es de Discogs), lo que traía.
  */
-export async function coverToSave(c: ReleaseCandidate): Promise<{ coverUrl?: string; thumbUrl?: string }> {
+export async function coverToSave(c: ReleaseCandidate, timeoutMs = SAVE_TIMEOUT_MS): Promise<{ coverUrl?: string; thumbUrl?: string }> {
   if (c.source === 'musicbrainz') {
-    const real = await resolveCover(coverChain(c, 'cover'))
+    const real = await resolveCover(coverChain(c, 'cover'), timeoutMs)
     if (real) return { coverUrl: real, thumbUrl: thumbFor(real) }
   }
   return { coverUrl: c.coverUrl, thumbUrl: c.thumbUrl }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { rankReleases, searchByBarcode, searchByText, vinylOnly, type MBRelease } from './musicbrainz'
+import { formatLabel, mbGet, rankReleases, searchByBarcode, searchByText, vinylOnly, type MBRelease } from './musicbrainz'
 
 /** Un lanzamiento como lo manda MusicBrainz, con lo justo para filtrar y ordenar. */
 function release(id: string, o: { artist?: string; title?: string; type?: string; secondary?: string[]; formats?: string[] | null; date?: string; score?: number; rg?: string } = {}): MBRelease {
@@ -56,6 +56,18 @@ describe('rankReleases', () => {
   })
 })
 
+describe('formatLabel', () => {
+  it('cuenta los medios repetidos y respeta el orden en que aparecen', () => {
+    const media = (...formats: (string | undefined)[]) => formats.map((format) => ({ format }))
+    expect(formatLabel(media('12" Vinyl', 'CD', 'CD', 'CD', 'DVD-Video'))).toBe('12" Vinyl, 3×CD, DVD-Video')
+    expect(formatLabel(media('12" Vinyl', '12" Vinyl'))).toBe('2×12" Vinyl')
+    expect(formatLabel(media('7" Vinyl'))).toBe('7" Vinyl')
+    expect(formatLabel(media(undefined, 'CD'))).toBe('CD')
+    expect(formatLabel([])).toBeUndefined()
+    expect(formatLabel(undefined)).toBeUndefined()
+  })
+})
+
 /** Respuesta JSON de MusicBrainz con estado dado. */
 function reply(status: number, body: unknown = {}): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -108,6 +120,21 @@ describe('searchByText', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('un trabajo de fondo que recibe 503 falla a la primera y no retiene la fila: la búsqueda sigue enseguida', async () => {
+    const at: number[] = []
+    fetchMock.mockImplementation(async () => {
+      at.push(Date.now())
+      return at.length === 1 ? reply(503) : reply(200, { count: 1, releases: [fixture[3]] })
+    })
+    const fondo = expect(mbGet('/artist', { query: 'artist:"x"', limit: 3 }, true)).rejects.toThrow('MusicBrainz está saturado')
+    const found = settled(searchByText('rumours'))
+    await fondo
+    expect(await found).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // Entre la petición de fondo y la del usuario solo pasa el espaciado de la fila (1.1 s), no la pausa del reintento.
+    expect(at[1] - at[0]).toBeLessThan(1500)
+  })
+
   it('otros errores siguen igual, sin reintento', async () => {
     fetchMock.mockResolvedValueOnce(reply(400))
     const check = expect(searchByText('rumours')).rejects.toThrow('MusicBrainz respondió 400')
@@ -127,6 +154,23 @@ describe('searchByText', () => {
     expect(second.searchParams.get('dismax')).toBe('true')
     expect(found).toHaveLength(23)
     expect(found.slice(0, 3).map((c) => c.sourceId)).toEqual(['cd0', 'cd1', 'cd2'])
+  })
+
+  it('si la segunda página falla, se queda con lo que trajo la primera', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => release(`p${i}`, { formats: i < 3 ? ['12" Vinyl'] : ['CD'] }))
+    fetchMock.mockResolvedValueOnce(reply(200, { count: 120, offset: 0, releases: page1 })).mockImplementation(async () => reply(503))
+    const found = await settled(searchByText('rumours'))
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(found.map((c) => c.sourceId)).toEqual(['p0', 'p1', 'p2'])
+  })
+
+  it('nunca pide una tercera página, aunque sigan faltando vinilos y haya más', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => release(`a${i}`, { formats: i < 2 ? ['12" Vinyl'] : ['CD'] }))
+    const page2 = Array.from({ length: 100 }, (_, i) => release(`b${i}`, { formats: i < 1 ? ['12" Vinyl'] : ['CD'] }))
+    fetchMock.mockResolvedValueOnce(reply(200, { count: 300, offset: 0, releases: page1 })).mockResolvedValueOnce(reply(200, { count: 300, offset: 100, releases: page2 }))
+    const found = await settled(searchByText('rumours'))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(found.map((c) => c.sourceId)).toEqual(['a0', 'a1', 'b0'])
   })
 
   it('con 8 o más vinilos, o sin más páginas, una sola petición', async () => {

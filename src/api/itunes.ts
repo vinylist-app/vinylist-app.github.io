@@ -1,4 +1,4 @@
-import { albumKey } from '../lib/text'
+import { albumKey, isVariousArtists } from '../lib/text'
 
 /**
  * iTunes Search API (https://performance-partners.apple.com/search-api): abierta, sin llave y con CORS.
@@ -6,6 +6,8 @@ import { albumKey } from '../lib/text'
  */
 const BASE = 'https://itunes.apple.com/search'
 const TIMEOUT_MS = 8000
+/** Apple nombra los sencillos y EP "Rumours - Single" o "Rumours - EP"; MusicBrainz, solo "Rumours". */
+const EDITION_SUFFIX = /\s+-\s+(EP|Single)$/i
 
 interface ITunesAlbum {
   artistName?: string
@@ -26,8 +28,9 @@ export async function searchArtwork(q: string): Promise<Map<string, string>> {
     const data = (await res.json()) as { results?: ITunesAlbum[] }
     const art = new Map<string, string>()
     for (const r of data.results ?? []) {
-      if (!r.artistName || !r.collectionName || !r.artworkUrl100) continue
-      const key = albumKey(r.artistName, r.collectionName)
+      // Las recopilaciones ("Various Artists") no se indexan: por título solo, se confunden entre sí.
+      if (!r.artistName || !r.collectionName || !r.artworkUrl100 || isVariousArtists(r.artistName)) continue
+      const key = albumKey(r.artistName, r.collectionName.replace(EDITION_SUFFIX, ''))
       if (!art.has(key)) art.set(key, largeArtwork(r.artworkUrl100))
     }
     return art

@@ -1,7 +1,7 @@
 import * as discogs from './discogs'
 import * as musicbrainz from './musicbrainz'
 import { searchArtwork } from './itunes'
-import { albumKey } from '../lib/text'
+import { albumKey, isVariousArtists } from '../lib/text'
 import type { ReleaseCandidate } from '../types'
 
 /** Busca primero en Discogs; si no hay nada (o falla), en MusicBrainz. */
@@ -24,15 +24,20 @@ async function musicbrainzText(q: string): Promise<ReleaseCandidate[]> {
 async function musicbrainzBarcode(barcode: string): Promise<ReleaseCandidate[]> {
   const found = await musicbrainz.searchByBarcode(barcode)
   const first = found[0]
-  if (!first?.artist || !first.title) return found
+  // Sin artista claro ("Varios", recopilaciones) Apple Music no puede decir cuál disco es.
+  if (!first?.artist || !first.title || isVariousArtists(first.artist)) return found
   return withArtwork(found, await searchArtwork(`${first.artist} ${first.title}`))
 }
 
-/** Pone `altCoverUrl` en cada candidato cuyo álbum (artista y título) tenga portada en Apple Music. */
+/**
+ * Pone `altCoverUrl` en cada candidato cuyo álbum (artista y título) tenga portada en Apple Music.
+ * Las recopilaciones ("Various Artists") quedan fuera: solo las distingue el título, y dos distintas
+ * con el mismo nombre se llevarían la misma portada.
+ */
 function withArtwork(found: ReleaseCandidate[], artwork: Map<string, string>): ReleaseCandidate[] {
   if (!artwork.size) return found
   return found.map((c) => {
-    const alt = artwork.get(albumKey(c.artist, c.title))
+    const alt = isVariousArtists(c.artist) ? undefined : artwork.get(albumKey(c.artist, c.title))
     return alt ? { ...c, altCoverUrl: alt } : c
   })
 }

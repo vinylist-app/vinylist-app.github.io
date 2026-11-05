@@ -63,7 +63,10 @@ class FakeImage {
 }
 
 describe('resolveCover', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
 
   it('sin Image (Node) devuelve la primera de la cadena', async () => {
     expect(await resolveCover(['a', 'b'])).toBe('a')
@@ -76,23 +79,39 @@ describe('resolveCover', () => {
     expect(FakeImage.loaded).toEqual(['https://x/falla-1', 'https://x/carga-2'])
     expect(await resolveCover(['https://x/falla-1', 'https://x/falla-2'])).toBeUndefined()
   })
-  it('una imagen que nunca responde pasa a la siguiente por tiempo', async () => {
+  it('una imagen que nunca responde pasa a la siguiente por tiempo, y se le vacía la fuente para cortar la descarga', async () => {
     vi.useFakeTimers()
-    class Muda extends FakeImage {
-      override set src(url: string) {
-        if (!url.includes('muda')) super.src = url
-      }
-    }
+    FakeImage.loaded = []
     vi.stubGlobal('Image', Muda)
     const p = resolveCover(['https://x/muda', 'https://x/carga'], 100)
     await vi.advanceTimersByTimeAsync(150)
     expect(await p).toBe('https://x/carga')
-    vi.useRealTimers()
+    expect(FakeImage.loaded).toEqual(['https://x/muda', '', 'https://x/carga'])
   })
 })
 
+/** `Image` falsa que nunca responde a lo que diga "muda" (pero lo anota). */
+class Muda extends FakeImage {
+  override set src(url: string) {
+    if (url.includes('muda')) FakeImage.loaded.push(url)
+    else super.src = url
+  }
+}
+
 describe('coverToSave', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('espera como mucho el tope dado por cada URL de la cadena', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('Image', Muda)
+    const c = { ...mb, thumbUrl: 'https://coverartarchive.org/release/muda/front-250', coverUrl: 'https://coverartarchive.org/release/muda/front-500' }
+    const p = coverToSave(c, 100)
+    await vi.advanceTimersByTimeAsync(150)
+    expect(await p).toEqual({ coverUrl: 'https://coverartarchive.org/release-group/rg-1/front-500', thumbUrl: 'https://coverartarchive.org/release-group/rg-1/front-250' })
+  })
 
   it('MusicBrainz: guarda la que cargó y su miniatura', async () => {
     vi.stubGlobal('Image', FakeImage)

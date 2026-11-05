@@ -117,7 +117,7 @@ h3 { font-size: 18px; }
 .btn--sm { min-height: 44px; padding: 8px 14px; font-size: 14px; }
 .btn--link { background: transparent; border-color: transparent; text-decoration: underline; text-underline-offset: 4px; }
 .btn .spotify, .spotify { color: var(--spotify); }
-.btn:disabled { opacity: 0.5; cursor: default; }
+.btn:disabled, .icon-btn:disabled { opacity: 0.5; cursor: default; }
 .icon-btn { width: 44px; height: 44px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--card); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; }
 .icon-btn--ghost { background: transparent; border-color: transparent; color: var(--text-2); }
 .header .icon-btn--ghost { margin: -10px -10px 0 0; }

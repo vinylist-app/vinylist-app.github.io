@@ -4,10 +4,10 @@ import type { Album } from '../types'
 import { coverChain } from '../lib/portada'
 import { StarRating } from './StarRating'
 
-/** Iniciales para las miniaturas sin portada: "Sketches of Spain" → "SS". */
+/** Iniciales para las miniaturas sin portada: "Sketches of Spain" → "SS", "Rumours (Deluxe)" → "RD". */
 function initials(title: string): string {
-  const words = title.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w))
-  return words.slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '·'
+  const letters = title.split(/\s+/).map((w) => w.match(/[\p{L}\p{N}]/u)?.[0] ?? '').filter(Boolean)
+  return letters.slice(0, 2).join('').toUpperCase() || '·'
 }
 
 /**

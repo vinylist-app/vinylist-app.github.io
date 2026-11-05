@@ -174,7 +174,7 @@ export function Preview() {
     <main className="page vista">
       <div className="hero-nav">
         <button type="button" className="btn btn--sm btn--ghost" onClick={back}><BackIcon width={20} height={20} /> {backLabel}</button>
-        <button type="button" className="icon-btn icon-btn--ghost" aria-label={myWish ? 'Quitar de mis deseos' : 'Agregar a mis deseos'} aria-pressed={Boolean(myWish)} onClick={toggleWish} disabled={wishBusy} style={{ color: 'var(--accent)' }}>
+        <button type="button" className="icon-btn icon-btn--ghost" aria-label={myWish ? 'Quitar de mis deseos' : 'Agregar a mis deseos'} aria-pressed={Boolean(myWish)} aria-busy={wishBusy} onClick={toggleWish} disabled={wishBusy} style={{ color: 'var(--accent)' }}>
           {myWish ? <HeartFilledIcon /> : <HeartIcon />}
         </button>
       </div>
@@ -253,8 +253,8 @@ export function Preview() {
             {owned ? (
               <button type="button" className="btn" onClick={add} disabled={adding}>{adding ? 'Agregando…' : 'Agregar otra copia'}</button>
             ) : (
-              <button type="button" className={`btn ${myWish ? 'vista-on' : ''}`} onClick={toggleWish} disabled={wishBusy} aria-pressed={Boolean(myWish)}>
-                {myWish ? <HeartFilledIcon width={18} height={18} /> : <HeartIcon width={18} height={18} />} {myWish ? 'En tus deseos' : 'Lo quiero'}
+              <button type="button" className={`btn ${myWish ? 'vista-on' : ''}`} onClick={toggleWish} disabled={wishBusy} aria-pressed={Boolean(myWish)} aria-busy={wishBusy}>
+                {myWish ? <HeartFilledIcon width={18} height={18} /> : <HeartIcon width={18} height={18} />} {wishBusy ? 'Guardando…' : myWish ? 'En tus deseos' : 'Lo quiero'}
               </button>
             )}
             <a className="btn" href={spotify} target="_blank" rel="noreferrer"><SpotifyIcon width={18} height={18} className="spotify" /> Escuchar<span className="visually-hidden"> «{c.title}» en Spotify</span></a>

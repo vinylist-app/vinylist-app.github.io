@@ -8,7 +8,10 @@ import type { ReleaseCandidate } from '../types'
 const BASE = 'https://musicbrainz.org/ws/2'
 const SPACING_MS = 1100
 const TIMEOUT_MS = 15000
-/** Ante 503 o 429 (saturado, o el límite por IP cuando dos celulares comparten red) se reintenta con estas pausas. */
+/**
+ * Ante 503 o 429 (saturado, o el límite por IP cuando dos celulares comparten red) se reintenta con estas pausas.
+ * Solo para lo que pidió el usuario: un trabajo de fondo falla a la primera, para no retener la fila.
+ */
 const RETRY_MS = [1500, 3000]
 const SATURATED = 'MusicBrainz está saturado. Espera unos segundos y vuelve a buscar.'
 /** Búsqueda por texto: tamaño de página, vinilos que bastan para no pedir la segunda y tope de resultados. */
@@ -44,7 +47,8 @@ async function drain(): Promise<void> {
   }
 }
 
-async function fetchJson<T>(path: string, params: Params): Promise<T> {
+async function fetchJson<T>(path: string, params: Params, background: boolean): Promise<T> {
+  const pauses = background ? [] : RETRY_MS
   const url = new URL(BASE + path)
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') url.searchParams.set(k, String(v))
   url.searchParams.set('fmt', 'json')
@@ -57,7 +61,7 @@ async function fetchJson<T>(path: string, params: Params): Promise<T> {
       throw e
     }
     if (res.status === 503 || res.status === 429) {
-      const pause = RETRY_MS[attempt]
+      const pause = pauses[attempt]
       if (pause === undefined) throw new Error(SATURATED)
       await new Promise((r) => setTimeout(r, pause))
       // La fila mide el espaciado desde la última petición: que cuente este reintento.
@@ -72,7 +76,7 @@ async function fetchJson<T>(path: string, params: Params): Promise<T> {
 /** `background` = trabajo de "Para ti" o del enlace a Spotify; cede el turno a las búsquedas del usuario. */
 export function mbGet<T>(path: string, params: Params, background = false): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    queue.push({ background, run: () => fetchJson<T>(path, params).then(resolve, reject) })
+    queue.push({ background, run: () => fetchJson<T>(path, params, background).then(resolve, reject) })
     void drain()
   })
 }
@@ -122,6 +126,13 @@ export function rankReleases(releases: MBRelease[], limit = MAX_RESULTS): MBRele
     .slice(0, limit)
 }
 
+/** Medios de una edición en un texto; los repetidos se cuentan: `12" Vinyl, CD, CD, CD, DVD-Video` → `12" Vinyl, 3×CD, DVD-Video`. */
+export function formatLabel(media: { format?: string }[] | undefined): string | undefined {
+  const counts = new Map<string, number>()
+  for (const m of media ?? []) if (m.format) counts.set(m.format, (counts.get(m.format) ?? 0) + 1)
+  return [...counts].map(([format, n]) => (n > 1 ? `${n}×${format}` : format)).join(', ') || undefined
+}
+
 function toCandidate(r: MBRelease): ReleaseCandidate {
   return {
     source: 'musicbrainz',
@@ -132,7 +143,7 @@ function toCandidate(r: MBRelease): ReleaseCandidate {
     country: r.country,
     label: r['label-info']?.[0]?.label?.name,
     catalogNumber: r['label-info']?.[0]?.['catalog-number'],
-    format: r.media?.map((m) => m.format).filter(Boolean).join(', ') || undefined,
+    format: formatLabel(r.media),
     barcode: r.barcode?.replace(/\D/g, '') || undefined,
     thumbUrl: coverUrl(r.id, 250),
     coverUrl: coverUrl(r.id, 500),
@@ -166,8 +177,12 @@ export async function searchByText(q: string): Promise<ReleaseCandidate[]> {
   const first = await mbGet<SearchPage>('/release', params)
   let releases = first.releases ?? []
   if (vinylOnly(releases).length < MIN_VINYL && (first.count ?? 0) > PAGE) {
-    const second = await mbGet<SearchPage>('/release', { ...params, offset: PAGE })
-    releases = releases.concat(second.releases ?? [])
+    try {
+      const second = await mbGet<SearchPage>('/release', { ...params, offset: PAGE })
+      releases = releases.concat(second.releases ?? [])
+    } catch {
+      // Con la primera página basta: mejor pocos resultados que el aviso de saturación.
+    }
   }
   return rankReleases(vinylOnly(releases)).map(toCandidate)
 }

@@ -23,7 +23,7 @@ export function CandidateList({ candidates, onPick, busyId, pickLabel, currentId
         const current = currentId !== undefined && c.sourceId === currentId
         return (
           <div className="result" key={`${c.source}-${c.sourceId}`}>
-            <Cover srcs={coverChain(c, 'thumb')} title="" className="thumb" />
+            <Cover srcs={coverChain(c, 'thumb')} title={c.title} className="thumb" />
             <div className="grow stack" style={{ gap: 2 }}>
               <span className="result__title">{c.title}</span>
               <span className="result__meta">{c.artist}{c.year ? ` · ${c.year}` : ''}</span>
