@@ -7,6 +7,7 @@ import { BackIcon } from '../components/Icons'
 import { ChevronIcon } from '../components/CuentaIcons'
 import { Sheet } from '../components/Sheet'
 import { Cover } from '../components/AlbumCard'
+import { coverChain } from '../lib/portada'
 import { StarRating } from '../components/StarRating'
 import { Columns, Donut, HBars, Meter, Readout, SegBar, segFill, type ColDatum, type DonutDatum } from '../components/NumerosFiguras'
 import { artistStats, copyStats, decadeStats, discos, donutSlices, familyStats, growthStats, heroStats, labelStats, moneyStats, OTHER_KEY, otrosLabel, pct, starStats, tagStats, yearsOf, type Bucket, type CondStats, type DecadeStats, type Extreme } from '../lib/stats'
@@ -446,7 +447,7 @@ function Estrellas({ albums }: { albums: Album[] }) {
           <div className="nu-best">
             {s.best.map((a) => (
               <Link key={a.id} to={`/album/${a.id}`} className="nu-best__item" aria-label={`${a.title}, ${cleanArtist(a.artist)}, ${ariaTextFor(a.rating)}`}>
-                <Cover src={a.thumbUrl ?? a.coverUrl} title={a.title} className="thumb nu-best__cover" />
+                <Cover srcs={coverChain(a, 'thumb')} title={a.title} className="thumb nu-best__cover" />
                 <StarRating value={a.rating} size={12} />
               </Link>
             ))}
