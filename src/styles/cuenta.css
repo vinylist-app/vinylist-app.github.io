@@ -82,6 +82,8 @@ button.cu-person:active { background: var(--card-2); }
 .cu-srow > span:last-child { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; min-width: 0; overflow-wrap: anywhere; }
 .cu-srow > span:last-child > .cu-chev { flex: none; }
 .cu-srow:active { background: var(--card-2); }
+.cu-srow:disabled { opacity: 0.5; cursor: default; }
+.cu-srow:disabled:active { background: transparent; }
 .cu-srow .cu-chev { color: var(--text-2); }
 .cu-name-edit { display: flex; align-items: center; gap: 6px; }
 .cu-name-edit .icon-btn { border-color: transparent; background: transparent; color: var(--text-2); width: 40px; height: 40px; }

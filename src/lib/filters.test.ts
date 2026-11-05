@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyFilters, DEFAULT_FILTERS, normalize, sortableArtist } from './filters'
+import { applyFilters, DEFAULT_FILTERS, filtersFromParams, normalize, sortableArtist } from './filters'
 import { formatStars, fromStars, starFill, toStars } from './rating'
 import type { Album } from '../types'
 
@@ -41,5 +41,18 @@ describe('medias estrellas', () => {
     expect(starFill(9, 4)).toBe('full')
     expect(starFill(9, 5)).toBe('half')
     expect(starFill(9, 6)).toBe('empty')
+  })
+})
+
+describe('filtros desde la URL', () => {
+  it('lee q, genero, decada y orden; ignora lo inválido', () => {
+    expect(filtersFromParams(new URLSearchParams('q=Coldplay&genero=Rock&decada=2020&orden=rating'))).toEqual({ query: 'Coldplay', genre: 'Rock', decade: 2020, sort: 'rating' })
+    expect(filtersFromParams(new URLSearchParams('decada=abc&orden=nada'))).toEqual({ query: '', sort: 'recent' })
+  })
+  it('cualquier año se redondea a su década; fuera de rango se ignora', () => {
+    expect(filtersFromParams(new URLSearchParams('decada=2025')).decade).toBe(2020)
+    expect(filtersFromParams(new URLSearchParams('decada=1969')).decade).toBe(1960)
+    expect(filtersFromParams(new URLSearchParams('decada=25')).decade).toBeUndefined()
+    expect(filtersFromParams(new URLSearchParams('decada=-2020')).decade).toBeUndefined()
   })
 })

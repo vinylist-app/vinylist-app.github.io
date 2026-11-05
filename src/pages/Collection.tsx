@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAlbums } from '../data/hooks'
-import { applyFilters, collectDecades, collectGenres, DEFAULT_FILTERS, type Filters } from '../lib/filters'
+import { applyFilters, collectDecades, collectGenres, filtersFromParams, type Filters } from '../lib/filters'
 import { AlbumCard } from '../components/AlbumCard'
-import { SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
+import { BarsIcon, SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
+import { decadeLabel } from '../lib/text'
 
 const SORTS: { value: Filters['sort']; label: string }[] = [
   { value: 'recent', label: 'Recientes' },
@@ -19,7 +20,9 @@ export function Collection() {
   // undefined mientras la base responde o la sesión arranca: se muestra "Cargando…", no el vacío de bienvenida.
   const cargando = loaded === undefined
   const albums = loaded ?? []
-  const [f, setF] = useState<Filters>(DEFAULT_FILTERS)
+  // Los filtros iniciales pueden venir en la URL ("Ver en la colección" desde En números); no se sincronizan de vuelta.
+  const [params] = useSearchParams()
+  const [f, setF] = useState<Filters>(() => filtersFromParams(params))
   const genres = useMemo(() => collectGenres(albums).slice(0, 12), [albums])
   const decades = useMemo(() => collectDecades(albums), [albums])
   const shown = useMemo(() => applyFilters(albums, f), [albums, f])
@@ -28,7 +31,7 @@ export function Collection() {
   const filtrado = conChips || f.query.trim() !== ''
   const resumen = [
     f.genre,
-    f.decade !== undefined && `años ${String(f.decade).slice(2)}`,
+    f.decade !== undefined && decadeLabel(f.decade),
     f.minRating !== undefined && '4.5+ estrellas',
     f.sort !== 'recent' && `ordenado por ${SORTS.find((s) => s.value === f.sort)?.label ?? ''}`,
   ].filter(Boolean).join(' · ')
@@ -43,7 +46,10 @@ export function Collection() {
             {!cargando && <span className="badge">{filtrado ? `${shown.length} de ${albums.length}` : `${albums.length} ${albums.length === 1 ? 'disco' : 'discos'}`}</span>}
           </div>
         </div>
-        <Link to="/ajustes" className="icon-btn icon-btn--ghost" aria-label="Ajustes"><SettingsIcon /></Link>
+        <div className="row" style={{ gap: 0 }}>
+          {albums.length > 0 && <Link to="/numeros" className="icon-btn icon-btn--ghost" aria-label="En números" style={{ marginRight: 0 }}><BarsIcon /></Link>}
+          <Link to="/ajustes" className="icon-btn icon-btn--ghost" aria-label="Ajustes"><SettingsIcon /></Link>
+        </div>
       </div>
 
       {albums.length > 0 && (
@@ -60,7 +66,7 @@ export function Collection() {
               <button key={g} className={`chip ${f.genre === g ? 'chip--on' : ''}`} onClick={() => setF({ ...f, genre: f.genre === g ? undefined : g })}>{g}</button>
             ))}
             {decades.map((d) => (
-              <button key={d} className={`chip ${f.decade === d ? 'chip--on' : ''}`} onClick={() => setF({ ...f, decade: f.decade === d ? undefined : d })}>Años {String(d).slice(2)}</button>
+              <button key={d} className={`chip ${f.decade === d ? 'chip--on' : ''}`} onClick={() => setF({ ...f, decade: f.decade === d ? undefined : d })}>{decadeLabel(d).replace('años', 'Años')}</button>
             ))}
             <button className={`chip ${f.minRating === 9 ? 'chip--on' : ''}`} onClick={() => setF({ ...f, minRating: f.minRating === 9 ? undefined : 9 })}>4.5+ estrellas</button>
             <select className={`chip chip--select ${f.sort !== 'recent' ? 'chip--on' : ''}`} aria-label="Ordenar" value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value as Filters['sort'] })}>
