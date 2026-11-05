@@ -8,6 +8,7 @@ import { generateCandidates, type CandidateRun, type Progress } from '../lib/tas
 import { albumKey, decadeLabel } from '../lib/text'
 import { spotifySearchUrl } from '../lib/spotify'
 import { Cover } from '../components/AlbumCard'
+import { coverChain } from '../lib/portada'
 import { SpotifyIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
 
@@ -127,7 +128,7 @@ export function ForYou() {
                 return (
                   <li className="card stack" key={s.key} style={{ gap: 10 }}>
                     <div className="row" style={{ alignItems: 'center' }}>
-                      <Cover src={s.thumbUrl ?? s.coverUrl} title={s.title} className="thumb" />
+                      <Cover srcs={coverChain(s, 'thumb')} title={s.title} className="thumb" />
                       <div className="grow stack" style={{ gap: 2 }}>
                         <h3 className="result__title">{s.title}</h3>
                         <span className="result__meta">{s.artist}{s.year ? ` · ${s.year}` : ''}</span>

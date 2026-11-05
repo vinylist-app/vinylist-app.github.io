@@ -3,6 +3,7 @@ import { addWish, deleteWish, updateWish } from '../db'
 import { useWishlist } from '../data/hooks'
 import { useSession } from '../session'
 import { Cover } from '../components/AlbumCard'
+import { coverChain } from '../lib/portada'
 import { SpotifyIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
 import { spotifySearchUrl } from '../lib/spotify'
@@ -47,7 +48,7 @@ export function Wishlist() {
           return (
             <div className="card stack" key={it.id} style={{ gap: 10 }}>
               <div className="row" style={{ alignItems: 'flex-start' }}>
-                <Cover src={it.coverUrl ?? it.thumbUrl} title={it.title} className="wish__cover" />
+                <Cover srcs={coverChain(it, 'cover')} title={it.title} className="wish__cover" />
                 <div className="grow stack" style={{ gap: 2 }}>
                   <span className="result__title">{it.title}</span>
                   <span className="result__meta">{it.artist}{it.year ? ` · ${it.year}` : ''}</span>

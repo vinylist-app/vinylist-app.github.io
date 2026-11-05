@@ -99,6 +99,8 @@ export interface ReleaseCandidate {
   discogsMasterId?: number
   musicbrainzArtistId?: string
   musicbrainzReleaseGroupId?: string
+  /** Portada de respaldo de Apple Music (600×600) para ediciones de MusicBrainz sin arte en Cover Art Archive. */
+  altCoverUrl?: string
   /** Cuántos coleccionistas lo tienen y lo buscan en Discogs (viene en la búsqueda). */
   community?: { have?: number; want?: number }
 }

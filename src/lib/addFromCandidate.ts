@@ -1,11 +1,13 @@
 import { addAlbum, cached, findDuplicate, type DuplicateMatch } from '../db'
 import { getRelease } from '../api/discogs'
+import { coverToSave } from './portada'
 import type { Album, ReleaseCandidate } from '../types'
 
 /**
  * Convierte una edición encontrada en un disco de la colección.
  * Si viene de Discogs, pide la ficha completa (canciones, portada grande) con la misma
  * llave de caché que la vista previa, así no se vuelve a pedir lo que ya se mostró.
+ * Si viene de MusicBrainz, antes de guardar averigua cuál portada de la cadena carga de verdad.
  */
 export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Album, 'id' | 'addedAt' | 'updatedAt' | 'collectionId'>> {
   if (c.source === 'discogs') {
@@ -34,6 +36,7 @@ export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Albu
       // Si la ficha completa falla, guardamos lo que ya tenemos.
     }
   }
+  const { coverUrl, thumbUrl } = await coverToSave(c)
   return {
     title: c.title,
     artist: c.artist,
@@ -45,8 +48,8 @@ export async function albumFromCandidate(c: ReleaseCandidate): Promise<Omit<Albu
     styles: c.styles,
     format: c.format,
     barcode: c.barcode,
-    coverUrl: c.coverUrl,
-    thumbUrl: c.thumbUrl,
+    coverUrl,
+    thumbUrl,
     tracklist: [],
     discogsId: c.source === 'discogs' ? Number(c.sourceId) : undefined,
     discogsMasterId: c.discogsMasterId,

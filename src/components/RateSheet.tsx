@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { updateAlbum } from '../db'
 import type { Album } from '../types'
 import { Cover } from './AlbumCard'
+import { coverChain } from '../lib/portada'
 import { BackIcon } from './Icons'
 import { Sheet } from './Sheet'
 import { StarSlider } from './StarSlider'
@@ -41,7 +42,7 @@ export function RateSheet({ album, onClose }: { album: Album; onClose: () => voi
         <button type="button" className="btn btn--sm btn--ghost" onClick={onClose}>Ahora no</button>
       </div>
 
-      <Cover src={album.coverUrl ?? album.thumbUrl} title={album.title} className="cal-sheet__cover" />
+      <Cover srcs={coverChain(album, 'cover')} title={album.title} className="cal-sheet__cover" />
       <div className="stack" style={{ gap: 4, alignItems: 'center' }}>
         <h2 id="cal-sheet-title">{album.title}</h2>
         {meta && <span className="muted" style={{ fontSize: 15 }}>{meta}</span>}

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { ReleaseCandidate } from '../types'
 import { Cover } from './AlbumCard'
+import { coverChain } from '../lib/portada'
 import { spotifySearchUrl } from '../lib/spotify'
 import { ChevronIcon } from './VistaIcons'
 
@@ -22,7 +23,7 @@ export function CandidateList({ candidates, onPick, busyId, pickLabel, currentId
         const current = currentId !== undefined && c.sourceId === currentId
         return (
           <div className="result" key={`${c.source}-${c.sourceId}`}>
-            <Cover src={c.thumbUrl} title="" className="thumb" />
+            <Cover srcs={coverChain(c, 'thumb')} title="" className="thumb" />
             <div className="grow stack" style={{ gap: 2 }}>
               <span className="result__title">{c.title}</span>
               <span className="result__meta">{c.artist}{c.year ? ` · ${c.year}` : ''}</span>
@@ -35,7 +36,7 @@ export function CandidateList({ candidates, onPick, busyId, pickLabel, currentId
           </div>
         )
       })}
-      <span className="muted">Datos e imágenes de {candidates[0]?.source === 'musicbrainz' ? 'MusicBrainz y Cover Art Archive' : 'Discogs'}</span>
+      <span className="muted">{candidates[0]?.source === 'musicbrainz' ? 'Datos de MusicBrainz; portadas de Cover Art Archive y Apple Music' : 'Datos e imágenes de Discogs'}</span>
     </div>
   )
 }

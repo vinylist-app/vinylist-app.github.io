@@ -8,6 +8,13 @@ import type { ReleaseCandidate } from '../types'
 const BASE = 'https://musicbrainz.org/ws/2'
 const SPACING_MS = 1100
 const TIMEOUT_MS = 15000
+/** Ante 503 o 429 (saturado, o el límite por IP cuando dos celulares comparten red) se reintenta con estas pausas. */
+const RETRY_MS = [1500, 3000]
+const SATURATED = 'MusicBrainz está saturado. Espera unos segundos y vuelve a buscar.'
+/** Búsqueda por texto: tamaño de página, vinilos que bastan para no pedir la segunda y tope de resultados. */
+const PAGE = 100
+const MIN_VINYL = 8
+const MAX_RESULTS = 40
 
 type Params = Record<string, string | number | undefined>
 interface Job {
@@ -41,16 +48,25 @@ async function fetchJson<T>(path: string, params: Params): Promise<T> {
   const url = new URL(BASE + path)
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') url.searchParams.set(k, String(v))
   url.searchParams.set('fmt', 'json')
-  let res: Response
-  try {
-    res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'TimeoutError') throw new Error('MusicBrainz tardó demasiado en responder. Intenta de nuevo.')
-    throw e
+  for (let attempt = 0; ; attempt++) {
+    let res: Response
+    try {
+      res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'TimeoutError') throw new Error('MusicBrainz tardó demasiado en responder. Intenta de nuevo.')
+      throw e
+    }
+    if (res.status === 503 || res.status === 429) {
+      const pause = RETRY_MS[attempt]
+      if (pause === undefined) throw new Error(SATURATED)
+      await new Promise((r) => setTimeout(r, pause))
+      // La fila mide el espaciado desde la última petición: que cuente este reintento.
+      lastAt = Date.now()
+      continue
+    }
+    if (!res.ok) throw new Error(`MusicBrainz respondió ${res.status}`)
+    return res.json() as Promise<T>
   }
-  if (res.status === 503) throw new Error('MusicBrainz pidió esperar un momento. Intenta en unos segundos.')
-  if (!res.ok) throw new Error(`MusicBrainz respondió ${res.status}`)
-  return res.json() as Promise<T>
 }
 
 /** `background` = trabajo de "Para ti" o del enlace a Spotify; cede el turno a las búsquedas del usuario. */
@@ -61,7 +77,8 @@ export function mbGet<T>(path: string, params: Params, background = false): Prom
   })
 }
 
-interface MBRelease {
+/** Un lanzamiento tal como lo manda la búsqueda de MusicBrainz (fmt=json). */
+export interface MBRelease {
   id: string
   title: string
   date?: string
@@ -71,32 +88,59 @@ interface MBRelease {
   'artist-credit'?: { name: string; joinphrase?: string; artist?: { id: string } }[]
   'label-info'?: { label?: { name: string }; 'catalog-number'?: string }[]
   media?: { format?: string }[]
-  'release-group'?: { id: string; 'primary-type'?: string }
+  'release-group'?: { id: string; 'primary-type'?: string; 'secondary-types'?: string[] }
   relations?: { type: string; url?: { resource: string } }[]
 }
 
-async function search(query: string): Promise<ReleaseCandidate[]> {
-  const data = await mbGet<{ releases: MBRelease[] }>('/release', { query, limit: 25 })
-  return data.releases
-    .filter((r) => !r.media?.length || r.media.some((m) => /vinyl/i.test(m.format ?? '')))
-    .map((r) => ({
-      source: 'musicbrainz' as const,
-      sourceId: r.id,
-      title: r.title,
-      artist: r['artist-credit']?.map((a) => a.name + (a.joinphrase ?? '')).join('') ?? 'Varios',
-      year: r.date ? Number(r.date.slice(0, 4)) || undefined : undefined,
-      country: r.country,
-      label: r['label-info']?.[0]?.label?.name,
-      catalogNumber: r['label-info']?.[0]?.['catalog-number'],
-      format: r.media?.map((m) => m.format).filter(Boolean).join(', ') || undefined,
-      barcode: r.barcode?.replace(/\D/g, '') || undefined,
-      thumbUrl: coverUrl(r.id, 250),
-      coverUrl: coverUrl(r.id, 500),
-      genres: [],
-      styles: [],
-      musicbrainzArtistId: r['artist-credit']?.[0]?.artist?.id,
-      musicbrainzReleaseGroupId: r['release-group']?.id,
-    }))
+interface SearchPage {
+  releases?: MBRelease[]
+  /** Total de coincidencias, no solo las de esta página. */
+  count?: number
+  offset?: number
+}
+
+/**
+ * Solo ediciones en vinilo: algún medio cuyo formato diga "vinyl" (`12" Vinyl`, `7" Vinyl`, `Vinyl`…).
+ * Las que no traen `media` pasan solo si `keepWithoutMedia` (por código de barras ya se sabe qué disco es).
+ */
+export function vinylOnly(releases: MBRelease[], keepWithoutMedia = false): MBRelease[] {
+  return releases.filter((r) => (r.media?.length ? r.media.some((m) => /vinyl/i.test(m.format ?? '')) : keepWithoutMedia))
+}
+
+const TYPE_ORDER: Record<string, number> = { Album: 0, EP: 1, Single: 2 }
+
+/**
+ * Orden de los resultados: puntaje de MusicBrainz; a igual puntaje, álbumes antes que EP, sencillos y lo demás;
+ * luego sin tipos secundarios (recopilación, en vivo…) antes que con; luego con fecha antes que sin.
+ * Estable: en empates se respeta el orden en que llegaron. Como mucho `limit` resultados.
+ */
+export function rankReleases(releases: MBRelease[], limit = MAX_RESULTS): MBRelease[] {
+  const typeRank = (r: MBRelease) => TYPE_ORDER[r['release-group']?.['primary-type'] ?? ''] ?? 3
+  const secondary = (r: MBRelease) => Number(Boolean(r['release-group']?.['secondary-types']?.length))
+  return [...releases]
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || typeRank(a) - typeRank(b) || secondary(a) - secondary(b) || Number(!a.date) - Number(!b.date))
+    .slice(0, limit)
+}
+
+function toCandidate(r: MBRelease): ReleaseCandidate {
+  return {
+    source: 'musicbrainz',
+    sourceId: r.id,
+    title: r.title,
+    artist: r['artist-credit']?.map((a) => a.name + (a.joinphrase ?? '')).join('') ?? 'Varios',
+    year: r.date ? Number(r.date.slice(0, 4)) || undefined : undefined,
+    country: r.country,
+    label: r['label-info']?.[0]?.label?.name,
+    catalogNumber: r['label-info']?.[0]?.['catalog-number'],
+    format: r.media?.map((m) => m.format).filter(Boolean).join(', ') || undefined,
+    barcode: r.barcode?.replace(/\D/g, '') || undefined,
+    thumbUrl: coverUrl(r.id, 250),
+    coverUrl: coverUrl(r.id, 500),
+    genres: [],
+    styles: [],
+    musicbrainzArtistId: r['artist-credit']?.[0]?.artist?.id,
+    musicbrainzReleaseGroupId: r['release-group']?.id,
+  }
 }
 
 export function coverUrl(mbid: string, size: 250 | 500 | 1200): string {
@@ -107,12 +151,25 @@ export function releaseGroupCoverUrl(rgMbid: string, size: 250 | 500 | 1200): st
   return `https://coverartarchive.org/release-group/${rgMbid}/front-${size}`
 }
 
-export function searchByBarcode(barcode: string): Promise<ReleaseCandidate[]> {
-  return search(`barcode:${barcode.replace(/\D/g, '')}`)
+export async function searchByBarcode(barcode: string): Promise<ReleaseCandidate[]> {
+  const data = await mbGet<SearchPage>('/release', { query: `barcode:${barcode.replace(/\D/g, '')}`, limit: 25 })
+  return vinylOnly(data.releases ?? [], true).map(toCandidate)
 }
 
-export function searchByText(q: string): Promise<ReleaseCandidate[]> {
-  return search(`${q} AND format:Vinyl`)
+/**
+ * Búsqueda "simple" de MusicBrainz (`dismax`): pondera título, artista y demás, así "fleetwood mac" encuentra
+ * por artista. Con dismax no se pueden combinar filtros, por eso el vinilo se filtra aquí. Si la primera
+ * página trae pocos vinilos y hay más, se pide una segunda; nunca más de dos peticiones por búsqueda.
+ */
+export async function searchByText(q: string): Promise<ReleaseCandidate[]> {
+  const params = { query: q, dismax: 'true', limit: PAGE }
+  const first = await mbGet<SearchPage>('/release', params)
+  let releases = first.releases ?? []
+  if (vinylOnly(releases).length < MIN_VINYL && (first.count ?? 0) > PAGE) {
+    const second = await mbGet<SearchPage>('/release', { ...params, offset: PAGE })
+    releases = releases.concat(second.releases ?? [])
+  }
+  return rankReleases(vinylOnly(releases)).map(toCandidate)
 }
 
 /** MBID del artista por nombre; solo si la coincidencia es clara. */

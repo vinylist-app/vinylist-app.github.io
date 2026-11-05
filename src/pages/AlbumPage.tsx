@@ -8,6 +8,7 @@ import { RateSheet } from '../components/RateSheet'
 import { Sheet } from '../components/Sheet'
 import { AboutAlbum } from '../components/AboutAlbum'
 import { Cover } from '../components/AlbumCard'
+import { coverChain } from '../lib/portada'
 import { BackIcon, DiscIcon, SpotifyIcon, StarPath } from '../components/Icons'
 import { formatStars } from '../lib/rating'
 import { averageOf, formatAverage } from '../lib/starSlider'
@@ -87,7 +88,7 @@ export function AlbumPage() {
       )}
       {undoError && <div className="notice notice--error" role="alert">{undoError}</div>}
       <div className="hero">
-        <Cover src={album.coverUrl ?? album.thumbUrl} title={album.title} className="hero__img" />
+        <Cover srcs={coverChain(album, 'cover')} title={album.title} className="hero__img" />
       </div>
 
       <div className="stack" style={{ gap: 4 }}>

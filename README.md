@@ -8,7 +8,7 @@ Es una **PWA**: se abre desde un enlace, se instala en la pantalla de inicio de 
 
 - Escanea el código de barras o busca a mano; elige tu edición exacta.
 - **Vista previa** antes de agregar: la app compara el disco con tu colección y te cuenta si sería tu primero del artista o del género, con cuáles de los tuyos va, qué te faltaría de su discografía, si es icónico y un dato de su historia (fuentes: tu colección, MusicBrainz, Wikipedia, Discogs, ListenBrainz). Luego decides: agregarlo, ponerlo en Deseos o solo escucharlo.
-- Portada, canciones y datos de Discogs (respaldo: MusicBrainz).
+- Portada, canciones y datos de Discogs (respaldo: MusicBrainz, con portadas de Cover Art Archive y Apple Music).
 - Calificación de 5 estrellas **con medias estrellas**.
 - Filtros por género, década y calificación; orden por artista, título o año.
 - Estado del disco y la funda, ubicación, datos de compra, notas.
@@ -88,6 +88,7 @@ firebase/
 
 - Discogs API: uso personal; parte de los datos está bajo sus términos de la API.
 - MusicBrainz y Cover Art Archive: datos abiertos.
+- Apple Music (iTunes Search API, sin llave): portada de respaldo cuando Cover Art Archive no tiene la de una edición.
 - ListenBrainz y ListenBrainz Labs (artistas parecidos, discos más escuchados): datos abiertos (CC0), sin clave.
 - Wikipedia y Wikidata: resúmenes bajo CC BY-SA, con enlace al artículo y su idioma.
 - Spotify: solo enlaces a su app (`open.spotify.com`); no se usa su API ni se guarda nada de tu cuenta.

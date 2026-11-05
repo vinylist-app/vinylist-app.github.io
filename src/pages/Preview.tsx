@@ -6,6 +6,7 @@ import { useAlbums, useWishlist } from '../data/hooks'
 import { personName, useSession } from '../session'
 import { discogsConfigured, getRelease, type ReleaseDetails } from '../api/discogs'
 import { addCandidate } from '../lib/addFromCandidate'
+import { coverChain, coverToSave } from '../lib/portada'
 import { matchInCollection, matchWishes } from '../lib/context/local'
 import { totalMinutes } from '../lib/context/pure'
 import { formatStars } from '../lib/rating'
@@ -150,7 +151,11 @@ export function Preview() {
     setError(null)
     try {
       if (myWish) await deleteWish(myWish.id)
-      else await addWish({ title: c.title, artist: c.artist, year: c.year, coverUrl: c.coverUrl ?? c.thumbUrl, thumbUrl: c.thumbUrl, discogsId: c.source === 'discogs' ? Number(c.sourceId) : undefined, discogsMasterId: c.discogsMasterId, musicbrainzReleaseGroupId: c.musicbrainzReleaseGroupId, barcode: c.barcode })
+      else {
+        // De MusicBrainz se guarda la portada que de verdad carga (edición, grupo de lanzamiento o Apple Music).
+        const { coverUrl, thumbUrl } = await coverToSave(c)
+        await addWish({ title: c.title, artist: c.artist, year: c.year, coverUrl: coverUrl ?? thumbUrl, thumbUrl, discogsId: c.source === 'discogs' ? Number(c.sourceId) : undefined, discogsMasterId: c.discogsMasterId, musicbrainzReleaseGroupId: c.musicbrainzReleaseGroupId, barcode: c.barcode })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el deseo.')
     } finally {
@@ -175,7 +180,7 @@ export function Preview() {
       </div>
 
       <header className="vista-head">
-        <Cover src={c.coverUrl ?? c.thumbUrl} title={c.title} className="vista-cover" />
+        <Cover srcs={coverChain(c, 'cover')} title={c.title} className="vista-cover" />
         <div className="vista-head__text">
           <span className="badge">{statusLabel}</span>
           <h2>{c.title}</h2>
@@ -282,7 +287,7 @@ function ownedLine(album: Pick<Album, 'addedAt' | 'addedBy' | 'rating' | 'rating
 
 /** "Datos e imagen de Discogs · Contexto de Wikipedia y MusicBrainz". */
 function sourcesLine(source: ReleaseCandidate['source'], contextSources: string[]): string {
-  const data = source === 'discogs' ? 'Datos e imagen de Discogs' : 'Datos de MusicBrainz e imagen de Cover Art Archive'
+  const data = source === 'discogs' ? 'Datos e imagen de Discogs' : 'Datos de MusicBrainz; portada de Cover Art Archive o Apple Music'
   const ctx = contextSources.filter((s) => s !== 'tu colección' && s !== (source === 'discogs' ? 'Discogs' : 'MusicBrainz'))
   return ctx.length ? `${data} · Contexto de ${ctx.join(', ').replace(/, ([^,]*)$/, ' y $1')}` : data
 }
