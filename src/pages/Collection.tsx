@@ -6,6 +6,7 @@ import { AlbumCard } from '../components/AlbumCard'
 import { BarsIcon, SearchIcon, ScanIcon, SettingsIcon } from '../components/Icons'
 import { Logo } from '../components/Logo'
 import { decadeLabel } from '../lib/text'
+import { useSession } from '../session'
 
 const SORTS: { value: Filters['sort']; label: string }[] = [
   { value: 'recent', label: 'Recientes' },
@@ -17,6 +18,10 @@ const SORTS: { value: Filters['sort']; label: string }[] = [
 
 export function Collection() {
   const loaded = useAlbums()
+  // Si la app tiene nube y nadie ha entrado, el vacío ofrece entrar primero: en un celular nuevo
+  // la colección está en la cuenta, no aquí.
+  const { cloudAvailable, status } = useSession()
+  const sinCuenta = cloudAvailable && status === 'signed-out'
   // undefined mientras la base responde o la sesión arranca: se muestra "Cargando…", no el vacío de bienvenida.
   const cargando = loaded === undefined
   const albums = loaded ?? []
@@ -82,10 +87,21 @@ export function Collection() {
       ) : albums.length === 0 ? (
         <div className="empty">
           <div className="empty__tiles" aria-hidden="true"><i /><i /><i /><i /></div>
-          <h2>Tu colección empieza aquí</h2>
-          <p>Escanea el código de barras de un disco o búscalo por nombre. La portada y los datos se llenan solos.</p>
-          <Link to="/escanear" className="btn btn--primary"><ScanIcon width={20} height={20} /> Escanear un disco</Link>
-          <Link to="/buscar" className="btn"><SearchIcon width={20} height={20} /> Buscar a mano</Link>
+          <h2>{sinCuenta ? 'Tu colección te espera' : 'Tu colección empieza aquí'}</h2>
+          {sinCuenta ? (
+            <>
+              <p>¿Ya tienes cuenta? Entra y tus discos aparecen en este celular. Si es tu primera vez, escanea un disco o búscalo por nombre.</p>
+              <Link to="/cuenta" className="btn btn--primary">Entrar con mi cuenta</Link>
+              <Link to="/escanear" className="btn"><ScanIcon width={20} height={20} /> Escanear un disco</Link>
+              <Link to="/buscar" className="btn"><SearchIcon width={20} height={20} /> Buscar a mano</Link>
+            </>
+          ) : (
+            <>
+              <p>Escanea el código de barras de un disco o búscalo por nombre. La portada y los datos se llenan solos.</p>
+              <Link to="/escanear" className="btn btn--primary"><ScanIcon width={20} height={20} /> Escanear un disco</Link>
+              <Link to="/buscar" className="btn"><SearchIcon width={20} height={20} /> Buscar a mano</Link>
+            </>
+          )}
         </div>
       ) : shown.length === 0 ? (
         <div className="empty"><p>Ningún disco coincide con ese filtro.</p></div>
